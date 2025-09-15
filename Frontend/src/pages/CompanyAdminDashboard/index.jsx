@@ -118,12 +118,33 @@ export default function CompanyAdminDashboard() {
   const navItems = tabList.map((item, idx) => ({ label: item.label, icon: item.icon, group: item.group, selected: tab === idx, onClick: () => setTab(idx) }));
   return (
     <SidebarLayout navItems={navItems} title="Company Admin">
-      <Paper elevation={1} sx={{ p: 1, borderRadius: 3 }}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto">
+      <Paper 
+        elevation={1} 
+        sx={{ 
+          p: { xs: 0.5, sm: 1 }, 
+          borderRadius: { xs: 2, sm: 3 },
+          overflow: 'hidden',
+          width: '100%',
+          maxWidth: '100%'
+        }}
+      >
+        <Tabs 
+          value={tab} 
+          onChange={(_, v) => setTab(v)} 
+          variant="scrollable" 
+          scrollButtons="auto"
+          sx={{
+            '& .MuiTabs-scrollButtons': {
+              '&.Mui-disabled': { opacity: 0.3 }
+            }
+          }}
+        >
           {tabList.map((item) => <Tab key={item.label} label={item.label} />)}
         </Tabs>
       </Paper>
-      <Box mt={2} className="fade-in">{tabComponents[tab]}</Box>
+      <Box mt={{ xs: 1, sm: 2 }} className="fade-in" sx={{ overflow: 'hidden', width: '100%' }}>
+        {tabComponents[tab]}
+      </Box>
     </SidebarLayout>
   );
 }

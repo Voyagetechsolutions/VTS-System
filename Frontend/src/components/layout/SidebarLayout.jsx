@@ -389,12 +389,13 @@ export default function SidebarLayout({ children, title, navItems }) {
         position="fixed"
         elevation={0}
         sx={{
-          width: { md: `calc(100% - ${currentDrawerWidth}px)` },
+          width: { xs: '100%', md: `calc(100% - ${currentDrawerWidth}px)` },
           ml: { md: `${currentDrawerWidth}px` },
           backgroundColor: theme.colors.background.primary,
           borderBottom: `1px solid ${theme.colors.border.light}`,
           color: theme.colors.text.primary,
           transition: theme.transitions.normal,
+          zIndex: { xs: 1300, md: 1200 }, // Ensure proper layering on mobile
         }}
       >
         <Toolbar sx={{ px: { xs: 2, md: 3 } }}>
@@ -423,7 +424,7 @@ export default function SidebarLayout({ children, title, navItems }) {
           
           {/* Branch Selector for Booking Office */}
           {userRole === 'booking_officer' && branches.length > 0 && (
-            <FormControl sx={{ mr: 2, minWidth: 150 }}>
+            <FormControl sx={{ mr: { xs: 1, sm: 2 }, minWidth: { xs: 120, sm: 150 }, display: { xs: 'none', sm: 'block' } }}>
               <Select
                 value={selectedBranch}
                 onChange={(e) => handleBranchChange(e.target.value)}
@@ -432,6 +433,7 @@ export default function SidebarLayout({ children, title, navItems }) {
                 sx={{
                   backgroundColor: theme.colors.background.primary,
                   borderRadius: theme.borderRadius.md,
+                  fontSize: { xs: '0.8rem', sm: '0.875rem' },
                   '& .MuiOutlinedInput-notchedOutline': {
                     borderColor: theme.colors.border.medium,
                   },
@@ -591,15 +593,23 @@ export default function SidebarLayout({ children, title, navItems }) {
         component="main"
         sx={{ 
           flexGrow: 1, 
-          p: { xs: 2, md: 3 }, 
-          width: { md: `calc(100% - ${currentDrawerWidth}px)` },
+          p: { xs: 1, sm: 2, md: 3 }, 
+          width: { xs: '100%', md: `calc(100% - ${currentDrawerWidth}px)` },
           transition: theme.transitions.normal,
           backgroundColor: theme.colors.background.secondary,
           minHeight: '100vh',
+          overflow: 'hidden',
         }}
       >
         <Toolbar />
-        <Box className="fade-in">
+        <Box 
+          className="fade-in"
+          sx={{
+            maxWidth: '100%',
+            overflow: 'auto',
+            WebkitOverflowScrolling: 'touch', // iOS smooth scrolling
+          }}
+        >
           {children}
         </Box>
       </Box>
