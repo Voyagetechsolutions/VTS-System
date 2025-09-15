@@ -1,0 +1,56 @@
+{
+  "name": "bus-mgmt-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^5.15.0",
+    "@mui/material": "^5.15.0",
+    "@sentry/react": "^7.120.4",
+    "@sentry/tracing": "^7.119.0",
+    "@supabase/supabase-js": "^2.56.0",
+    "axios": "^1.6.0",
+    "bcryptjs": "^3.0.2",
+    "html5-qrcode": "^2.3.8",
+    "jspdf": "^2.5.2",
+    "leaflet": "^1.9.4",
+    "notistack": "^3.0.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.22.0",
+    "recharts": "^3.1.2",
+    "logrocket": "^10.1.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "cy:open": "cypress open",
+    "cy:run": "cypress run",
+    "depcheck": "depcheck --skip-missing=true",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .js,.jsx"
+  },
+  "devDependencies": {
+    "cypress": "^13.8.1",
+    "depcheck": "^1.4.7",
+    "react-scripts": "^5.0.1",
+    "vitest": "^2.0.5",
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/jest-dom": "^6.4.2",
+    "eslint": "^8.57.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
