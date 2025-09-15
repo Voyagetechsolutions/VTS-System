@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <title>iOS Test - Bus Management</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+                sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-item {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .pass { background-color: #d4edda; border-color: #c3e6cb; }
+        .fail { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .error-log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>iOS Compatibility Test</h1>
+        <div id="results"></div>
+        
+        <h2>Actions</h2>
+        <button onclick="testReactApp()">Test React App Load</button>
+        <button onclick="testStorage()">Test Storage</button>
+        <button onclick="clearLogs()">Clear Logs</button>
+        <button onclick="window.location.href='/'">Go to Main App</button>
+        
+        <h2>Error Log</h2>
+        <div id="errorLog" class="error-log"></div>
+    </div>
+
+    <script>
+        const results = document.getElementById('results');
+        const errorLog = document.getElementById('errorLog');
+        let logs = [];
+
+        function log(message) {
+            console.log(message);
+            logs.push(new Date().toISOString() + ': ' + message);
+            errorLog.textContent = logs.join('\n');
+        }
+
+        function addResult(test, status, details = '') {
+            const div = document.createElement('div');
+            div.className = 'test-item ' + status;
+            div.innerHTML = '<strong>' + test + ':</strong> ' + status.toUpperCase() + 
+                           (details ? '<br><small>' + details + '</small>' : '');
+            results.appendChild(div);
+        }
+
+        function testReactApp() {
+            log('Testing React app load...');
+            
+            // Test if React can be loaded
+            try {
+                const script = document.createElement('script');
+                script.src = '/static/js/bundle.js';
+                script.onerror = function() {
+                    addResult('React Bundle Load', 'fail', 'Bundle.js failed to load');
+                    log('React bundle failed to load');
+                };
+                script.onload = function() {
+                    addResult('React Bundle Load', 'pass', 'Bundle.js loaded successfully');
+                    log('React bundle loaded successfully');
+                };
+                document.head.appendChild(script);
+            } catch (e) {
+                addResult('React Bundle Load', 'fail', e.message);
+                log('React bundle load error: ' + e.message);
+            }
+        }
+
+        function testStorage() {
+            try {
+                localStorage.setItem('test', 'value');
+                const value = localStorage.getItem('test');
+                localStorage.removeItem('test');
+                addResult('LocalStorage', value === 'value' ? 'pass' : 'fail');
+            } catch (e) {
+                addResult('LocalStorage', 'fail', e.message);
+            }
+        }
+
+        function clearLogs() {
+            logs = [];
+            errorLog.textContent = '';
+            results.innerHTML = '';
+        }
+
+        // Run initial tests
+        log('Starting iOS compatibility tests...');
+        
+        // Device info
+        addResult('User Agent', 'info', navigator.userAgent);
+        addResult('Platform', 'info', navigator.platform);
+        addResult('Language', 'info', navigator.language);
+        addResult('Screen Size', 'info', screen.width + 'x' + screen.height);
+        addResult('Viewport Size', 'info', window.innerWidth + 'x' + window.innerHeight);
+
+        // Feature tests
+        try {
+            const test = {};
+            const result = test?.missing?.property;
+            addResult('Optional Chaining (?.)', 'pass');
+        } catch (e) {
+            addResult('Optional Chaining (?.)', 'fail', e.message);
+        }
+
+        try {
+            const test = null ?? 'default';
+            addResult('Nullish Coalescing (??)', test === 'default' ? 'pass' : 'fail');
+        } catch (e) {
+            addResult('Nullish Coalescing (??)', 'fail', e.message);
+        }
+
+        try {
+            const test = () => 'arrow function';
+            addResult('Arrow Functions', test() === 'arrow function' ? 'pass' : 'fail');
+        } catch (e) {
+            addResult('Arrow Functions', 'fail', e.message);
+        }
+
+        try {
+            const test = `template literal`;
+            addResult('Template Literals', test === 'template literal' ? 'pass' : 'fail');
+        } catch (e) {
+            addResult('Template Literals', 'fail', e.message);
+        }
+
+        try {
+            async function testAsync() {
+                return await Promise.resolve('async works');
+            }
+            testAsync().then(result => {
+                addResult('Async/Await', result === 'async works' ? 'pass' : 'fail');
+            }).catch(e => {
+                addResult('Async/Await', 'fail', e.message);
+            });
+        } catch (e) {
+            addResult('Async/Await', 'fail', e.message);
+        }
+
+        testStorage();
+
+        // Global error handlers
+        window.addEventListener('error', function(e) {
+            addResult('Global Error Caught', 'fail', e.message + ' at ' + e.filename + ':' + e.lineno);
+            log('Global error: ' + e.message);
+        });
+
+        window.addEventListener('unhandledrejection', function(e) {
+            addResult('Unhandled Promise Rejection', 'fail', e.reason);
+            log('Unhandled rejection: ' + e.reason);
+        });
+
+        log('Initial tests completed');
+    </script>
+</body>
+</html>
