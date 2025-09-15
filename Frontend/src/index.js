@@ -1,3 +1,9 @@
+// iOS polyfills must be imported first
+import 'core-js/stable';
+import 'core-js/modules/es.promise';
+import 'core-js/modules/es.array.includes';
+import 'core-js/modules/es.string.includes';
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { initIOSPolyfills, isIOS } from './utils/iosPolyfills';

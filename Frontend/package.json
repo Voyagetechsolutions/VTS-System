@@ -20,11 +20,13 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0",
     "recharts": "^3.1.2",
-    "logrocket": "^10.1.0"
+    "logrocket": "^10.1.0",
+    "core-js": "^3.32.0"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "start": "craco start",
+    "build": "craco build",
+    "build:legacy": "set GENERATE_SOURCEMAP=false && craco build",
     "cy:open": "cypress open",
     "cy:run": "cypress run",
     "depcheck": "depcheck --skip-missing=true",
@@ -33,6 +35,9 @@
     "lint": "eslint src --ext .js,.jsx"
   },
   "devDependencies": {
+    "@craco/craco": "^7.1.0",
+    "@babel/plugin-proposal-optional-chaining": "^7.21.0",
+    "@babel/plugin-proposal-nullish-coalescing-operator": "^7.18.6",
     "cypress": "^13.8.1",
     "depcheck": "^1.4.7",
     "react-scripts": "^5.0.1",
@@ -45,12 +50,15 @@
     "production": [
       ">0.2%",
       "not dead",
-      "not op_mini all"
+      "not op_mini all",
+      "ios_saf >= 10",
+      "safari >= 10"
     ],
     "development": [
       "last 1 chrome version",
       "last 1 firefox version",
-      "last 1 safari version"
+      "last 1 safari version",
+      "ios_saf >= 10"
     ]
   }
 }
