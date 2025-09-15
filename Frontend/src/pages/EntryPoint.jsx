@@ -158,33 +158,33 @@ export default function EntryPoint() {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5' }}>
-      <Box sx={{ bgcolor: '#1976d2', color: 'white', py: 4, textAlign: 'center' }}>
-        <Typography variant="h3" fontWeight={700} gutterBottom>Bus Management System</Typography>
-        <Typography variant="h6">Multi-tenant SaaS for Bus Companies, Staff, and Customers</Typography>
+      <Box sx={{ bgcolor: '#1976d2', color: 'white', py: { xs: 3, sm: 4 }, textAlign: 'center', px: 2 }}>
+        <Typography variant="h3" fontWeight={700} gutterBottom sx={{ fontSize: { xs: '1.75rem', sm: '2.125rem' } }}>Bus Management System</Typography>
+        <Typography variant="h6" sx={{ fontSize: { xs: '0.95rem', sm: '1.25rem' } }}>Multi-tenant SaaS for Bus Companies, Staff, and Customers</Typography>
       </Box>
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', mt: 6 }}>
-        <Paper sx={{ width: 420, p: 4, mr: 4, boxShadow: 4 }} elevation={3}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', mt: { xs: 3, sm: 6 }, flexDirection: { xs: 'column', md: 'row' }, gap: { xs: 2, md: 0 }, px: { xs: 2, sm: 3 } }}>
+        <Paper sx={{ width: '100%', maxWidth: 520, p: { xs: 2.5, sm: 4 }, mr: { md: 4 }, boxShadow: 4 }} elevation={3}>
           <Typography variant="h5" gutterBottom>Book Your Bus Trip</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Find and book a seat on any participating company. No login required!
           </Typography>
           <form onSubmit={handleBooking}>
-            <TextField label="From" fullWidth margin="normal" value={booking.from} onChange={e => setBooking({ ...booking, from: e.target.value })} required />
-            <TextField label="To" fullWidth margin="normal" value={booking.to} onChange={e => setBooking({ ...booking, to: e.target.value })} required />
-            <TextField label="Date" type="date" fullWidth margin="normal" value={booking.date} onChange={e => setBooking({ ...booking, date: e.target.value })} InputLabelProps={{ shrink: true }} required />
-            <TextField label="Passenger Name" fullWidth margin="normal" value={booking.name} onChange={e => setBooking({ ...booking, name: e.target.value })} required />
-            <TextField label="Passenger Phone/Email" fullWidth margin="normal" value={booking.contact} onChange={e => setBooking({ ...booking, contact: e.target.value })} required />
-            <TextField select label="Company" fullWidth margin="normal" value={booking.company_id} onChange={e => setBooking({ ...booking, company_id: e.target.value })} required>
+            <TextField label="From" fullWidth margin="normal" value={booking.from} onChange={e => setBooking({ ...booking, from: e.target.value })} required sx={{ '& .MuiInputBase-input': { fontSize: { xs: 14, sm: 16 } } }} />
+            <TextField label="To" fullWidth margin="normal" value={booking.to} onChange={e => setBooking({ ...booking, to: e.target.value })} required sx={{ '& .MuiInputBase-input': { fontSize: { xs: 14, sm: 16 } } }} />
+            <TextField label="Date" type="date" fullWidth margin="normal" value={booking.date} onChange={e => setBooking({ ...booking, date: e.target.value })} InputLabelProps={{ shrink: true }} required sx={{ '& .MuiInputBase-input': { fontSize: { xs: 14, sm: 16 } } }} />
+            <TextField label="Passenger Name" fullWidth margin="normal" value={booking.name} onChange={e => setBooking({ ...booking, name: e.target.value })} required sx={{ '& .MuiInputBase-input': { fontSize: { xs: 14, sm: 16 } } }} />
+            <TextField label="Passenger Phone/Email" fullWidth margin="normal" value={booking.contact} onChange={e => setBooking({ ...booking, contact: e.target.value })} required sx={{ '& .MuiInputBase-input': { fontSize: { xs: 14, sm: 16 } } }} />
+            <TextField select label="Company" fullWidth margin="normal" value={booking.company_id} onChange={e => setBooking({ ...booking, company_id: e.target.value })} required sx={{ '& .MuiSelect-select': { fontSize: { xs: 14, sm: 16 } } }} SelectProps={{ MenuProps: { PaperProps: { sx: { maxHeight: 300 } } } }}>
               {companies.map(c => (
-                <MenuItem key={c.company_id} value={c.company_id}>{c.name}</MenuItem>
+                <MenuItem key={c.company_id} value={c.company_id} sx={{ fontSize: { xs: 14, sm: 16 } }}>{c.name}</MenuItem>
               ))}
             </TextField>
-            <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }}>Book Now</Button>
+            <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2, py: { xs: 1, sm: 1.25 }, fontSize: { xs: 14, sm: 16 } }}>Book Now</Button>
           </form>
           {bookingSuccess && <Alert severity="success" sx={{ mt: 2 }}>{bookingSuccess}</Alert>}
           {bookingError && <Alert severity="error" sx={{ mt: 2 }}>{bookingError}</Alert>}
         </Paper>
-        <Paper sx={{ width: 420, p: 4, ml: 4, boxShadow: 4 }} elevation={3}>
+        <Paper sx={{ width: '100%', maxWidth: 520, p: { xs: 2.5, sm: 4 }, ml: { md: 4 }, boxShadow: 4 }} elevation={3}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
             <Typography variant="h5" gutterBottom sx={{ flexGrow: 1 }}>Company & Staff Login</Typography>
             <Button variant="text" color="secondary" onClick={handleShowDevForm} sx={{ textTransform: 'none' }}>Developer Setup</Button>
@@ -195,14 +195,14 @@ export default function EntryPoint() {
           </Typography>
           {!showDevForm && (
             <form onSubmit={handleLogin}>
-              <TextField label="Email" type="email" fullWidth margin="normal" value={login.email} onChange={e => setLogin({ ...login, email: e.target.value })} required />
-              <TextField label="Password" type="password" fullWidth margin="normal" value={login.password} onChange={e => setLogin({ ...login, password: e.target.value })} required />
-              <TextField select label="Role" fullWidth margin="normal" value={login.role} onChange={e => setLogin({ ...login, role: e.target.value })}>
+              <TextField label="Email" type="email" fullWidth margin="normal" value={login.email} onChange={e => setLogin({ ...login, email: e.target.value })} required sx={{ '& .MuiInputBase-input': { fontSize: { xs: 14, sm: 16 } } }} />
+              <TextField label="Password" type="password" fullWidth margin="normal" value={login.password} onChange={e => setLogin({ ...login, password: e.target.value })} required sx={{ '& .MuiInputBase-input': { fontSize: { xs: 14, sm: 16 } } }} />
+              <TextField select label="Role" fullWidth margin="normal" value={login.role} onChange={e => setLogin({ ...login, role: e.target.value })} sx={{ '& .MuiSelect-select': { fontSize: { xs: 14, sm: 16 } } }} SelectProps={{ MenuProps: { PaperProps: { sx: { maxHeight: 300 } } } }}>
                 {roles.map(r => (
-                  <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>
+                  <MenuItem key={r.value} value={r.value} sx={{ fontSize: { xs: 14, sm: 16 } }}>{r.label}</MenuItem>
                 ))}
               </TextField>
-              <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }}>Login</Button>
+              <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2, py: { xs: 1, sm: 1.25 }, fontSize: { xs: 14, sm: 16 } }}>Login</Button>
             </form>
           )}
           {showDevForm && (
@@ -212,10 +212,10 @@ export default function EntryPoint() {
                 <Button variant="text" color="primary" onClick={handleHideDevForm} sx={{ textTransform: 'none' }}>Back to Login</Button>
               </Box>
               <form onSubmit={handleDevSubmit}>
-                <TextField label="Name" fullWidth margin="normal" value={devForm.name} onChange={e => setDevForm({ ...devForm, name: e.target.value })} required />
-                <TextField label="Email" type="email" fullWidth margin="normal" value={devForm.email} onChange={e => setDevForm({ ...devForm, email: e.target.value })} required />
-                <TextField label="Password" type="password" fullWidth margin="normal" value={devForm.password} onChange={e => setDevForm({ ...devForm, password: e.target.value })} required />
-                <Button type="submit" variant="contained" color="secondary" fullWidth sx={{ mt: 2 }}>Save Developer</Button>
+                <TextField label="Name" fullWidth margin="normal" value={devForm.name} onChange={e => setDevForm({ ...devForm, name: e.target.value })} required sx={{ '& .MuiInputBase-input': { fontSize: { xs: 14, sm: 16 } } }} />
+                <TextField label="Email" type="email" fullWidth margin="normal" value={devForm.email} onChange={e => setDevForm({ ...devForm, email: e.target.value })} required sx={{ '& .MuiInputBase-input': { fontSize: { xs: 14, sm: 16 } } }} />
+                <TextField label="Password" type="password" fullWidth margin="normal" value={devForm.password} onChange={e => setDevForm({ ...devForm, password: e.target.value })} required sx={{ '& .MuiInputBase-input': { fontSize: { xs: 14, sm: 16 } } }} />
+                <Button type="submit" variant="contained" color="secondary" fullWidth sx={{ mt: 2, py: { xs: 1, sm: 1.25 }, fontSize: { xs: 14, sm: 16 } }}>Save Developer</Button>
               </form>
               {devSuccess && <Alert severity="success" sx={{ mt: 2 }}>{devSuccess}</Alert>}
               {devError && <Alert severity="error" sx={{ mt: 2 }}>{devError}</Alert>}
