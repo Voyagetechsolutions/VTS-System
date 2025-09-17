@@ -27,7 +27,7 @@ import {
   Dashboard as DashboardIcon,
   Settings as SettingsIcon
 } from '@mui/icons-material';
-import { supabase } from '../../../utils/supabaseClient';
+import { supabase } from '../../../supabase/client';
 
 export default function SettingsTab() {
   const [activeTab, setActiveTab] = useState(0);

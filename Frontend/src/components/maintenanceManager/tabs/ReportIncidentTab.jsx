@@ -39,7 +39,7 @@ import {
   Person as PersonIcon,
   DateRange as DateRangeIcon
 } from '@mui/icons-material';
-import { supabase } from '../../../utils/supabaseClient';
+import { supabase } from '../../../supabase/client';
 import DataTable from '../../common/DataTable';
 
 export default function ReportIncidentTab() {
