@@ -1,60 +1,400 @@
 import React, { useEffect, useState } from 'react';
-import { Grid } from '@mui/material';
+import { Box, Grid, Card, CardContent, Typography, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControl, InputLabel, Select, MenuItem, IconButton, Tooltip, Alert } from '@mui/material';
+import { Add as AddIcon, Visibility as ViewIcon, Edit as EditIcon, Send as SendIcon, Payment as PaymentIcon, Business as BusinessIcon, MonetizationOn as MonetizationOnIcon, Warning as WarningIcon, CheckCircle as CheckCircleIcon, Schedule as ScheduleIcon } from '@mui/icons-material';
 import DashboardCard from '../../common/DashboardCard';
 import DataTable from '../../common/DataTable';
-import { getSubscriptions, updateSubscription, getInvoices } from '../../../supabase/api';
+import { getSubscriptions, updateSubscription, getInvoices, getCompaniesLight } from '../../../supabase/api';
 
 export default function BillingDevTab() {
   const [subs, setSubs] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Filter states
+  const [planFilter, setPlanFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
+  const [searchCompany, setSearchCompany] = useState('');
+  
+  // Modal states
+  const [showBillingProfile, setShowBillingProfile] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState(null);
+  const [showSendReminder, setShowSendReminder] = useState(false);
 
   const load = async () => {
     setLoading(true);
-    const [s, i] = await Promise.all([getSubscriptions(), getInvoices()]);
+    const [s, i, c] = await Promise.all([getSubscriptions(), getInvoices(), getCompaniesLight()]);
     setSubs(s.data || []);
     setInvoices(i.data || []);
+    setCompanies(c.data || []);
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
+  const filteredSubs = subs.filter(sub => {
+    const company = companies.find(c => c.company_id === sub.company_id);
+    return (
+      (planFilter ? sub.plan === planFilter : true) &&
+      (statusFilter ? sub.status === statusFilter : true) &&
+      (paymentStatusFilter ? getPaymentStatus(sub) === paymentStatusFilter : true) &&
+      (searchCompany ? (company?.name || '').toLowerCase().includes(searchCompany.toLowerCase()) : true)
+    );
+  });
+
+  const getPaymentStatus = (sub) => {
+    // Mock payment status logic - replace with actual implementation
+    if (sub.status === 'Active') return 'Paid';
+    if (sub.status === 'Past Due') return 'Overdue';
+    return 'Pending';
+  };
+
+  const getPaymentStatusColor = (status) => {
+    switch (status) {
+      case 'Paid': return 'success';
+      case 'Overdue': return 'error';
+      case 'Pending': return 'warning';
+      default: return 'default';
+    }
+  };
+
+  const getPaymentStatusIcon = (status) => {
+    switch (status) {
+      case 'Paid': return <CheckCircleIcon />;
+      case 'Overdue': return <WarningIcon />;
+      case 'Pending': return <ScheduleIcon />;
+      default: return <PaymentIcon />;
+    }
+  };
+
+  const handleViewBilling = (company) => {
+    setSelectedCompany(company);
+    setShowBillingProfile(true);
+  };
+
+  const handleSendReminder = (company) => {
+    setSelectedCompany(company);
+    setShowSendReminder(true);
+  };
+
+  const handleMarkPaid = async (subscriptionId) => {
+    try {
+      await updateSubscription(subscriptionId, { status: 'Active' });
+      load();
+    } catch (error) {
+      console.error('Error marking as paid:', error);
+    }
+  };
+
+  const actions = [
+    { 
+      label: 'View', 
+      icon: <ViewIcon />, 
+      onClick: ({ row }) => {
+        const company = companies.find(c => c.company_id === row.company_id);
+        handleViewBilling(company);
+      },
+      color: 'primary'
+    },
+    { 
+      label: 'Change Plan', 
+      icon: <EditIcon />, 
+      onClick: async ({ row }) => { 
+        // TODO: Implement change plan functionality
+        console.log('Change plan for:', row);
+      },
+      color: 'info'
+    },
+    { 
+      label: 'Send Reminder', 
+      icon: <SendIcon />, 
+      onClick: ({ row }) => {
+        const company = companies.find(c => c.company_id === row.company_id);
+        handleSendReminder(company);
+      },
+      color: 'warning'
+    },
+    { 
+      label: 'Mark Paid', 
+      icon: <PaymentIcon />, 
+      onClick: async ({ row }) => { 
+        await handleMarkPaid(row.id);
+      },
+      color: 'success'
+    },
+  ];
+
   return (
-    <Grid container spacing={2}>
-      <Grid item xs={12}>
-        <DashboardCard title="Subscriptions" variant="outlined">
+    <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1">
+          Billing & Subscriptions
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<MonetizationOnIcon />}
+          >
+            Export Reports
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<SendIcon />}
+          >
+            Send Billing Reminder
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Revenue Summary */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ textAlign: 'center', p: 2 }}>
+            <CardContent>
+              <Typography variant="h4" color="primary">
+                {companies.length}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">Active Companies</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ textAlign: 'center', p: 2 }}>
+            <CardContent>
+              <Typography variant="h4" color="success.main">
+                R{subs.reduce((sum, sub) => sum + (sub.amount || 0), 0).toLocaleString()}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">Total Revenue</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ textAlign: 'center', p: 2 }}>
+            <CardContent>
+              <Typography variant="h4" color="error.main">
+                {subs.filter(sub => getPaymentStatus(sub) === 'Overdue').length}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">Overdue Payments</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ textAlign: 'center', p: 2 }}>
+            <CardContent>
+              <Typography variant="h4" color="warning.main">
+                {subs.filter(sub => getPaymentStatus(sub) === 'Pending').length}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">Pending Payments</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Filters */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                fullWidth
+                label="Search by Company"
+                value={searchCompany}
+                onChange={(e) => setSearchCompany(e.target.value)}
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Plan</InputLabel>
+                <Select
+                  value={planFilter}
+                  label="Plan"
+                  onChange={(e) => setPlanFilter(e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="Basic">Basic</MenuItem>
+                  <MenuItem value="Standard">Standard</MenuItem>
+                  <MenuItem value="Premium">Premium</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={statusFilter}
+                  label="Status"
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="Active">Active</MenuItem>
+                  <MenuItem value="Expired">Expired</MenuItem>
+                  <MenuItem value="Trial">Trial</MenuItem>
+                  <MenuItem value="Suspended">Suspended</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Payment Status</InputLabel>
+                <Select
+                  value={paymentStatusFilter}
+                  label="Payment Status"
+                  onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="Paid">Up to Date</MenuItem>
+                  <MenuItem value="Overdue">Overdue</MenuItem>
+                  <MenuItem value="Pending">Pending</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* Companies Billing Table */}
+      <Card>
+        <CardContent>
           <DataTable
-            data={subs}
+            data={filteredSubs}
             loading={loading}
             columns={[
-              { field: 'id', headerName: 'ID' },
-              { field: 'company_id', headerName: 'Company' },
-              { field: 'plan', headerName: 'Plan' },
-              { field: 'amount', headerName: 'Amount', type: 'currency' },
-              { field: 'current_period_end', headerName: 'Period End', type: 'date' },
-              { field: 'status', headerName: 'Status', type: 'status' },
+              { 
+                field: 'company_id', 
+                headerName: 'Company',
+                renderCell: (params) => {
+                  const company = companies.find(c => c.company_id === params.value);
+                  return (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <BusinessIcon color="primary" />
+                      <Typography variant="body2" sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
+                        {company?.name || 'Unknown Company'}
+                      </Typography>
+                    </Box>
+                  );
+                }
+              },
+              { 
+                field: 'plan', 
+                headerName: 'Plan',
+                renderCell: (params) => (
+                  <Chip 
+                    label={params.value} 
+                    color={params.value === 'Premium' ? 'primary' : params.value === 'Standard' ? 'secondary' : 'default'}
+                    size="small"
+                  />
+                )
+              },
+              { 
+                field: 'current_period_end', 
+                headerName: 'Next Billing Date',
+                type: 'date',
+                renderCell: (params) => (
+                  <Typography variant="body2">
+                    {params.value ? new Date(params.value).toLocaleDateString() : 'N/A'}
+                  </Typography>
+                )
+              },
+              { 
+                field: 'amount', 
+                headerName: 'Amount',
+                renderCell: (params) => (
+                  <Typography variant="body2" fontWeight="bold">
+                    R{params.value?.toLocaleString() || '0'}
+                  </Typography>
+                )
+              },
+              { 
+                field: 'status', 
+                headerName: 'Payment Status',
+                renderCell: (params) => {
+                  const paymentStatus = getPaymentStatus(params.row);
+                  return (
+                    <Chip 
+                      label={paymentStatus}
+                      color={getPaymentStatusColor(paymentStatus)}
+                      size="small"
+                      icon={getPaymentStatusIcon(paymentStatus)}
+                    />
+                  );
+                }
+              },
             ]}
+            rowActions={actions}
             searchable
             pagination
           />
-        </DashboardCard>
-      </Grid>
-      <Grid item xs={12}>
-        <DashboardCard title="Invoices" variant="outlined">
-          <DataTable
-            data={invoices}
-            loading={loading}
-            columns={[
-              { field: 'id', headerName: 'ID' },
-              { field: 'company_id', headerName: 'Company' },
-              { field: 'status', headerName: 'Status', type: 'status' },
-              { field: 'amount', headerName: 'Amount', type: 'currency' },
-            ]}
-            searchable
-            pagination
-          />
-        </DashboardCard>
-      </Grid>
-    </Grid>
+        </CardContent>
+      </Card>
+
+      {/* Company Billing Profile Modal */}
+      <Dialog open={showBillingProfile} onClose={() => setShowBillingProfile(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <BusinessIcon />
+            {selectedCompany?.name} - Billing Profile
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {selectedCompany && (
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="subtitle2" color="text.secondary">Company Name</Typography>
+                <Typography variant="body1">{selectedCompany.name}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="subtitle2" color="text.secondary">Contact Email</Typography>
+                <Typography variant="body1">{selectedCompany.email}</Typography>
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Subscription Details</Typography>
+                <Alert severity="info">
+                  Current Plan: Premium | Next Billing: 2025-10-01 | Amount: R700
+                </Alert>
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Recent Invoices</Typography>
+                <DataTable
+                  data={invoices.filter(inv => inv.company_id === selectedCompany.company_id)}
+                  loading={false}
+                  columns={[
+                    { field: 'id', headerName: 'Invoice #' },
+                    { field: 'amount', headerName: 'Amount', type: 'currency' },
+                    { field: 'status', headerName: 'Status', type: 'status' },
+                    { field: 'created_at', headerName: 'Date', type: 'date' },
+                  ]}
+                  searchable={false}
+                  pagination={false}
+                />
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowBillingProfile(false)}>Close</Button>
+          <Button variant="contained">Change Plan</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Send Reminder Modal */}
+      <Dialog open={showSendReminder} onClose={() => setShowSendReminder(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Send Billing Reminder</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            Send a billing reminder to {selectedCompany?.name}?
+          </Typography>
+          <Alert severity="warning">
+            This will send an email reminder about their upcoming or overdue payment.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowSendReminder(false)}>Cancel</Button>
+          <Button variant="contained" color="warning">Send Reminder</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }
