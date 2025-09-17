@@ -6,9 +6,8 @@ import StaffRBACTab from '../../components/maintenanceManager/tabs/StaffRBACTab'
 import TasksWorkflowTab from '../../components/maintenanceManager/tabs/TasksWorkflowTab';
 import FleetHealthTab from '../../components/maintenanceManager/tabs/FleetHealthTab';
 import InventoryTab from '../../components/maintenanceManager/tabs/InventoryTab';
-import IncidentsQCTab from '../../components/maintenanceManager/tabs/IncidentsQCTab';
-import ReportsTab from '../../components/maintenanceManager/tabs/ReportsTab';
-import NotificationsTab from '../../components/maintenanceManager/tabs/NotificationsTab';
+import ReportIncidentTab from '../../components/maintenanceManager/tabs/ReportIncidentTab';
+import ReportsAnalyticsTab from '../../components/maintenanceManager/tabs/ReportsAnalyticsTab';
 import SettingsTab from '../../components/maintenanceManager/tabs/SettingsTab';
 
 const tabList = [
@@ -17,9 +16,8 @@ const tabList = [
   'Maintenance Tasks & Workflow',
   'Fleet Health & Predictive',
   'Inventory & Parts',
-  'Incidents & Quality Control',
+  'Report Incident',
   'Reports & Analytics',
-  'Notifications & Alerts',
   'Settings & Customization',
 ];
 
@@ -29,9 +27,8 @@ const tabComponents = [
   <TasksWorkflowTab />,
   <FleetHealthTab />,
   <InventoryTab />,
-  <IncidentsQCTab />,
-  <ReportsTab />,
-  <NotificationsTab />,
+  <ReportIncidentTab />,
+  <ReportsAnalyticsTab />,
   <SettingsTab />,
 ];
 
