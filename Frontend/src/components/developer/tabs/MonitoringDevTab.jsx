@@ -223,27 +223,155 @@ export default function MonitoringDevTab() {
   };
 
   return (
-    <DashboardCard title="System Monitoring & Logs" variant="outlined" headerAction={
-      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-        <ModernTextField label="From" type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} />
-        <ModernTextField label="To" type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
-        <ModernTextField label="Type" value={typeSearch} onChange={e => setTypeSearch(e.target.value)} />
-        <ModernTextField label="Message" value={messageSearch} onChange={e => setMessageSearch(e.target.value)} />
-        <ModernButton variant="outlined" icon="download" onClick={exportCSV}>Export CSV</ModernButton>
-      </Box>
-    }>
-      <DataTable
-        data={filtered}
-        loading={loading}
-        columns={[
-          { field: 'created_at', headerName: 'Time', type: 'date' },
-          { field: 'type', headerName: 'Type' },
-          { field: 'message', headerName: 'Message' },
-          { field: 'company_id', headerName: 'Company' },
-        ]}
-        searchable
-        pagination
-      />
-    </DashboardCard>
+    <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
+      <Typography variant="h4" component="h1" sx={{ mb: 3 }}>
+        Monitoring & Logs
+      </Typography>
+      
+      {/* System Monitoring Overview */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={6} sm={3}>
+          <Card sx={{ textAlign: 'center', p: 2 }}>
+            <CardContent>
+              <Typography variant="h4" color="success.main">{systemMetrics.activeCompanies}</Typography>
+              <Typography variant="body2" color="text.secondary">Active Companies</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Card sx={{ textAlign: 'center', p: 2 }}>
+            <CardContent>
+              <Typography variant="h4" color="primary">{systemMetrics.activeBuses}</Typography>
+              <Typography variant="body2" color="text.secondary">Active Buses</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Card sx={{ textAlign: 'center', p: 2 }}>
+            <CardContent>
+              <Typography variant="h4" color="info.main">{systemMetrics.bookingsToday.toLocaleString()}</Typography>
+              <Typography variant="body2" color="text.secondary">Bookings Today</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Card sx={{ textAlign: 'center', p: 2 }}>
+            <CardContent>
+              <Typography variant="h4" color="success.main">R{systemMetrics.transactionsToday.toLocaleString()}</Typography>
+              <Typography variant="body2" color="text.secondary">Transactions Today</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Logs Tabs */}
+      <Card>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
+            <Tab label="Activity Logs" />
+            <Tab label="Error & Security Logs" />
+          </Tabs>
+        </Box>
+
+        {/* Activity Logs Tab */}
+        {activeTab === 0 && (
+          <CardContent>
+            <DataTable
+              data={filteredActivityLogs}
+              loading={loading}
+              columns={[
+                { 
+                  field: 'created_at', 
+                  headerName: 'Timestamp', 
+                  type: 'date', 
+                  sortable: true,
+                  renderCell: (params) => (
+                    <Typography variant="body2">
+                      {new Date(params.value).toLocaleString()}
+                    </Typography>
+                  )
+                },
+                { 
+                  field: 'type', 
+                  headerName: 'Action',
+                  renderCell: (params) => (
+                    <Typography variant="body2">
+                      {params.value}
+                    </Typography>
+                  )
+                },
+                { 
+                  field: 'message', 
+                  headerName: 'Details',
+                  renderCell: (params) => (
+                    <Typography variant="body2">
+                      {params.value}
+                    </Typography>
+                  )
+                },
+              ]}
+              rowActions={activityActions}
+              searchable
+              pagination
+            />
+          </CardContent>
+        )}
+
+        {/* Error & Security Logs Tab */}
+        {activeTab === 1 && (
+          <CardContent>
+            <DataTable
+              data={filteredErrorLogs}
+              loading={loading}
+              columns={[
+                { 
+                  field: 'timestamp', 
+                  headerName: 'Timestamp', 
+                  type: 'date', 
+                  sortable: true,
+                  renderCell: (params) => (
+                    <Typography variant="body2">
+                      {new Date(params.value).toLocaleString()}
+                    </Typography>
+                  )
+                },
+                { 
+                  field: 'severity', 
+                  headerName: 'Severity',
+                  renderCell: (params) => (
+                    <Chip 
+                      label={params.value} 
+                      color={getSeverityColor(params.value)}
+                      size="small"
+                    />
+                  )
+                },
+                { 
+                  field: 'error', 
+                  headerName: 'Error / Event',
+                  renderCell: (params) => (
+                    <Typography variant="body2">
+                      {params.value}
+                    </Typography>
+                  )
+                },
+                { 
+                  field: 'actionTaken', 
+                  headerName: 'Action Taken',
+                  renderCell: (params) => (
+                    <Typography variant="body2" color="text.secondary">
+                      {params.value}
+                    </Typography>
+                  )
+                },
+              ]}
+              rowActions={errorActions}
+              searchable
+              pagination
+            />
+          </CardContent>
+        )}
+      </Card>
+    </Box>
   );
 }
