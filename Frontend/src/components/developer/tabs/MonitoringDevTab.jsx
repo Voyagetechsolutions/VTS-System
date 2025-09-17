@@ -57,38 +57,17 @@ export default function MonitoringDevTab() {
       setActivityLogs(activityRes.data || []);
       setCompanies(companiesRes.data || []);
       
-      // Mock error logs and system metrics - replace with actual API calls
-      const mockErrorLogs = [
-        {
-          id: 1,
-          timestamp: '2025-01-16T11:20:00Z',
-          severity: 'high',
-          module: 'Transactions',
-          error: 'Payment Gateway Timeout',
-          actionTaken: 'Retried',
-          details: 'Payment gateway response timeout after 30 seconds'
-        },
-        {
-          id: 2,
-          timestamp: '2025-01-16T11:35:00Z',
-          severity: 'medium',
-          module: 'Login',
-          error: 'Multiple Failed Logins',
-          actionTaken: 'Account Locked',
-          details: 'User admin@blue.com attempted login 5 times with wrong password'
-        }
-      ];
-      
-      setErrorLogs(mockErrorLogs);
+      // TODO: Replace with actual API calls for error logs and system metrics
+      setErrorLogs([]);
       setSystemMetrics({
-        activeCompanies: 120,
-        activeBuses: 350,
-        bookingsToday: 1250,
-        transactionsToday: 875000,
-        errorsToday: 14,
-        systemUptime: 99.9,
-        avgResponseTime: 150,
-        failedLogins: 3
+        activeCompanies: 0,
+        activeBuses: 0,
+        bookingsToday: 0,
+        transactionsToday: 0,
+        errorsToday: 0,
+        systemUptime: 0,
+        avgResponseTime: 0,
+        failedLogins: 0
       });
     } catch (error) {
       console.error('Error loading data:', error);
