@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Grid, Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Select, MenuItem } from '@mui/material';
+import { Grid, Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Select, MenuItem, Card, CardContent, Typography, Chip, IconButton, Avatar, FormControl, InputLabel } from '@mui/material';
+import { DirectionsBus as BusIcon, CheckCircle as CheckCircleIcon, Build as BuildIcon, Search as SearchIcon, Schedule as ScheduleIcon, PersonAdd as PersonAddIcon, Assessment as AssessmentIcon, Notifications as NotificationsIcon, AccessTime as TimeIcon, LocalGasStation as FuelIcon, Engineering as EngineeringIcon, Construction as ConstructionIcon, Warning as WarningIcon, TrendingUp as TrendingUpIcon } from '@mui/icons-material';
 import DashboardCard, { StatsCard, QuickActionCard } from '../../common/DashboardCard';
 import DataTable from '../../common/DataTable';
 import CommandCenterMap from '../../companyAdmin/tabs/CommandCenterMap';
@@ -12,12 +13,47 @@ export default function CommandCenterTab() {
   const [tasks, setTasks] = useState([]);
   const [buses, setBuses] = useState([]);
   const [staff, setStaff] = useState([]);
-  const [taskOpen, setTaskOpen] = useState(false);
-  const [schedOpen, setSchedOpen] = useState(false);
-  const [staffOpen, setStaffOpen] = useState(false);
-  const [reportOpen, setReportOpen] = useState(false);
-  const [form, setForm] = useState({ bus_id: '', title: '', priority: 'medium', notes: '', staff_id: '' });
   const companyId = window.companyId || localStorage.getItem('companyId');
+  
+  // Modal states
+  const [showAssignTask, setShowAssignTask] = useState(false);
+  const [showScheduleMaintenance, setShowScheduleMaintenance] = useState(false);
+  const [showAddStaff, setShowAddStaff] = useState(false);
+  const [showGenerateReport, setShowGenerateReport] = useState(false);
+  
+  // Form states
+  const [taskForm, setTaskForm] = useState({
+    bus_id: '',
+    title: '',
+    priority: 'medium',
+    notes: '',
+    staff_id: '',
+    dueDate: ''
+  });
+  
+  const [scheduleForm, setScheduleForm] = useState({
+    bus_id: '',
+    maintenanceType: '',
+    date: '',
+    workshopBay: ''
+  });
+  
+  const [staffForm, setStaffForm] = useState({
+    name: '',
+    email: '',
+    role: 'maintenance_tech',
+    contact: '',
+    status: 'Active'
+  });
+  
+  const [reportForm, setReportForm] = useState({
+    reportType: 'daily',
+    filters: {
+      bus: '',
+      taskStatus: '',
+      staff: ''
+    }
+  });
 
   const load = async () => {
     const start = new Date(); start.setHours(0,0,0,0); const end = new Date(); end.setHours(23,59,59,999);
@@ -57,118 +93,832 @@ export default function CommandCenterTab() {
 
   useEffect(() => { load(); }, [companyId]);
 
-  const actions = [
-    { label: 'Assign Task', icon: 'checklist', onClick: () => { setForm({ bus_id: '', title: '', priority: 'medium', notes: '', staff_id: '' }); setTaskOpen(true); } },
-    { label: 'Schedule Maintenance', icon: 'wrench', onClick: () => { setForm({ bus_id: '', title: '', priority: 'medium', notes: '', staff_id: '' }); setSchedOpen(true); } },
-    { label: 'Add Staff', icon: 'personAdd', onClick: () => { setForm({ bus_id: '', title: '', priority: 'medium', notes: '', staff_id: '' }); setStaffOpen(true); } },
-    { label: 'Generate Report', icon: 'report', onClick: () => { setForm({ bus_id: '', title: '', priority: 'medium', notes: '', staff_id: '' }); setReportOpen(true); } },
-  ];
+  const handleAssignTask = async () => {
+    try {
+      if (!taskForm.bus_id || !taskForm.title) return;
+      await supabase.from('maintenance_tasks').insert([{
+        company_id: companyId,
+        bus_id: taskForm.bus_id,
+        title: taskForm.title,
+        priority: taskForm.priority,
+        status: 'pending',
+        notes: taskForm.notes || null,
+        assigned_to: taskForm.staff_id || null,
+        due_date: taskForm.dueDate || null
+      }]);
+      setShowAssignTask(false);
+      setTaskForm({ bus_id: '', title: '', priority: 'medium', notes: '', staff_id: '', dueDate: '' });
+      load();
+    } catch (error) {
+      console.error('Error assigning task:', error);
+    }
+  };
+
+  const handleScheduleMaintenance = async () => {
+    try {
+      if (!scheduleForm.bus_id) return;
+      await upsertMaintenanceLog({
+        bus_id: scheduleForm.bus_id,
+        notes: `Scheduled ${scheduleForm.maintenanceType} maintenance`,
+        status: 'scheduled',
+        scheduled_date: scheduleForm.date,
+        workshop_bay: scheduleForm.workshopBay
+      });
+      setShowScheduleMaintenance(false);
+      setScheduleForm({ bus_id: '', maintenanceType: '', date: '', workshopBay: '' });
+      load();
+    } catch (error) {
+      console.error('Error scheduling maintenance:', error);
+    }
+  };
+
+  const handleAddStaff = async () => {
+    try {
+      if (!staffForm.name || !staffForm.email) return;
+      await supabase.from('users').insert([{
+        company_id: companyId,
+        name: staffForm.name,
+        email: staffForm.email.toLowerCase(),
+        role: staffForm.role,
+        phone: staffForm.contact,
+        is_active: staffForm.status === 'Active'
+      }]);
+      setShowAddStaff(false);
+      setStaffForm({ name: '', email: '', role: 'maintenance_tech', contact: '', status: 'Active' });
+      load();
+    } catch (error) {
+      console.error('Error adding staff:', error);
+    }
+  };
+
+  const handleGenerateReport = async () => {
+    try {
+      await supabase.from('reports_queue').insert([{
+        company_id: companyId,
+        type: reportForm.reportType + '_report',
+        params: reportForm.filters
+      }]);
+      alert('Report generation queued');
+      setShowGenerateReport(false);
+    } catch (error) {
+      console.error('Error generating report:', error);
+    }
+  };
 
   return (
-    <>
-    <Grid container spacing={2}>
-      <Grid item xs={12}>
-        <DashboardCard title="Live Fleet Map" variant="elevated">
-          <CommandCenterMap />
-        </DashboardCard>
-      </Grid>
+    <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1">
+          Maintenance Dashboard
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <IconButton>
+            <NotificationsIcon />
+          </IconButton>
+          <Typography variant="body2" color="text.secondary">
+            {new Date().toLocaleString()}
+          </Typography>
+        </Box>
+      </Box>
 
-      <Grid item xs={12}>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6} md={3}><StatsCard title="Fleet" value={kpis.fleet} icon="bus" color="primary" /></Grid>
-          <Grid item xs={12} sm={6} md={3}><StatsCard title="In Operation" value={kpis.operation} icon="trendingUp" color="success" /></Grid>
-          <Grid item xs={12} sm={6} md={3}><StatsCard title="Under Maintenance" value={kpis.maintenance} icon="wrench" color="warning" /></Grid>
-          <Grid item xs={12} sm={6} md={3}><StatsCard title="Awaiting Inspection" value={kpis.inspection} icon="security" color="info" /></Grid>
-          <Grid item xs={12} sm={6} md={3}><StatsCard title="Tasks Completed" value={kpis.tasksDone} icon="check" color="success" /></Grid>
-          <Grid item xs={12} sm={6} md={3}><StatsCard title="Tasks Pending" value={kpis.tasksPending} icon="schedule" color="warning" /></Grid>
-          <Grid item xs={12} sm={6} md={3}><StatsCard title="Downtime (hrs)" value={kpis.downtimeHrs} icon="timer" color="error" /></Grid>
-          <Grid item xs={12} sm={6} md={3}><StatsCard title="Staff Utilization" value={`${kpis.staffUtil}%`} icon="percent" color="primary" /></Grid>
-          <Grid item xs={12} sm={6} md={3}><StatsCard title="Workshop Bays Busy" value={kpis.baysBusy} icon="garage" color="secondary" /></Grid>
-          <Grid item xs={12} sm={6} md={3}><StatsCard title="Fuel Logs Today" value={kpis.fuelingToday} icon="fuel" color="info" /></Grid>
+      {/* Live Fleet Map */}
+      <Card sx={{ mb: 4 }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2 }}>Live Fleet Map</Typography>
+          <CommandCenterMap />
+        </CardContent>
+      </Card>
+
+      {/* Top KPI Cards */}
+      <Grid container spacing={2} sx={{ mb: 4 }}>
+        <Grid item xs={6} sm={4} md={2}>
+          <Card sx={{ 
+            textAlign: 'center', 
+            p: 2, 
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 }
+          }}>
+            <CardContent>
+              <BusIcon sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+              <Typography variant="h4" color="primary" fontWeight="bold">
+                {kpis.fleet}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">Fleet</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={4} md={2}>
+          <Card sx={{ 
+            textAlign: 'center', 
+            p: 2, 
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 }
+          }}>
+            <CardContent>
+              <TrendingUpIcon sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
+              <Typography variant="h4" color="success.main" fontWeight="bold">
+                {kpis.operation}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">In Operation</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={4} md={2}>
+          <Card sx={{ 
+            textAlign: 'center', 
+            p: 2, 
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 }
+          }}>
+            <CardContent>
+              <BuildIcon sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
+              <Typography variant="h4" color="warning.main" fontWeight="bold">
+                {kpis.maintenance}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">Under Maintenance</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={4} md={2}>
+          <Card sx={{ 
+            textAlign: 'center', 
+            p: 2, 
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 }
+          }}>
+            <CardContent>
+              <SearchIcon sx={{ fontSize: 40, color: 'info.main', mb: 1 }} />
+              <Typography variant="h4" color="info.main" fontWeight="bold">
+                {kpis.inspection}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">Awaiting Inspection</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={4} md={2}>
+          <Card sx={{ 
+            textAlign: 'center', 
+            p: 2, 
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 }
+          }}>
+            <CardContent>
+              <CheckCircleIcon sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
+              <Typography variant="h4" color="success.main" fontWeight="bold">
+                {kpis.tasksDone}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">Tasks Completed</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={4} md={2}>
+          <Card sx={{ 
+            textAlign: 'center', 
+            p: 2, 
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 }
+          }}>
+            <CardContent>
+              <ScheduleIcon sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
+              <Typography variant="h4" color="warning.main" fontWeight="bold">
+                {kpis.tasksPending}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">Tasks Pending</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={4} md={2}>
+          <Card sx={{ 
+            textAlign: 'center', 
+            p: 2, 
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 }
+          }}>
+            <CardContent>
+              <TimeIcon sx={{ fontSize: 40, color: 'error.main', mb: 1 }} />
+              <Typography variant="h4" color="error.main" fontWeight="bold">
+                {kpis.downtimeHrs}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">Downtime (hrs)</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={4} md={2}>
+          <Card sx={{ 
+            textAlign: 'center', 
+            p: 2, 
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 }
+          }}>
+            <CardContent>
+              <EngineeringIcon sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+              <Typography variant="h4" color="primary" fontWeight="bold">
+                {kpis.staffUtil}%
+              </Typography>
+              <Typography variant="body2" color="text.secondary">Staff Utilization</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={4} md={2}>
+          <Card sx={{ 
+            textAlign: 'center', 
+            p: 2, 
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 }
+          }}>
+            <CardContent>
+              <ConstructionIcon sx={{ fontSize: 40, color: 'secondary.main', mb: 1 }} />
+              <Typography variant="h4" color="secondary.main" fontWeight="bold">
+                {kpis.baysBusy}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">Workshop Bays Busy</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={4} md={2}>
+          <Card sx={{ 
+            textAlign: 'center', 
+            p: 2, 
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 }
+          }}>
+            <CardContent>
+              <FuelIcon sx={{ fontSize: 40, color: 'info.main', mb: 1 }} />
+              <Typography variant="h4" color="info.main" fontWeight="bold">
+                {kpis.fuelingToday}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">Fuel Logs Today</Typography>
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
 
-      <Grid item xs={12} md={4}>
-        <QuickActionCard title="Quick Actions" actions={actions} />
+      {/* Quick Actions */}
+      <Typography variant="h5" sx={{ mb: 2 }}>Quick Actions</Typography>
+      <Grid container spacing={2} sx={{ mb: 4 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card
+            sx={{
+              height: '100%',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: 3
+              }
+            }}
+            onClick={() => setShowAssignTask(true)}
+          >
+            <CardContent sx={{ textAlign: 'center', p: 3 }}>
+              <AssessmentIcon sx={{ fontSize: 40, color: 'primary.main', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                Assign Task
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Assign maintenance tasks to staff
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card
+            sx={{
+              height: '100%',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: 3
+              }
+            }}
+            onClick={() => setShowScheduleMaintenance(true)}
+          >
+            <CardContent sx={{ textAlign: 'center', p: 3 }}>
+              <ScheduleIcon sx={{ fontSize: 40, color: 'success.main', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                Schedule Maintenance
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Plan routine maintenance
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card
+            sx={{
+              height: '100%',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: 3
+              }
+            }}
+            onClick={() => setShowAddStaff(true)}
+          >
+            <CardContent sx={{ textAlign: 'center', p: 3 }}>
+              <PersonAddIcon sx={{ fontSize: 40, color: 'info.main', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                Add Staff
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Add maintenance staff
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card
+            sx={{
+              height: '100%',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: 3
+              }
+            }}
+            onClick={() => setShowGenerateReport(true)}
+          >
+            <CardContent sx={{ textAlign: 'center', p: 3 }}>
+              <AssessmentIcon sx={{ fontSize: 40, color: 'warning.main', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                Generate Report
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Generate maintenance reports
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
-      <Grid item xs={12} md={8}>
-        <DashboardCard title="Notifications & Alerts" variant="outlined">
-          <DataTable data={alerts} columns={[{ field: 'created_at', headerName: 'Time', type: 'date' }, { field: 'type', headerName: 'Type' }, { field: 'message', headerName: 'Message' }]} searchable pagination />
-        </DashboardCard>
+
+      {/* Main Tables */}
+      <Grid container spacing={3}>
+        {/* Notifications & Alerts */}
+        <Grid item xs={12} lg={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2 }}>Notifications & Alerts</Typography>
+              <DataTable
+                data={alerts}
+                loading={false}
+                columns={[
+                  { 
+                    field: 'created_at', 
+                    headerName: 'Date', 
+                    type: 'date',
+                    renderCell: (params) => (
+                      <Typography variant="body2">
+                        {new Date(params.value).toLocaleDateString()}
+                      </Typography>
+                    )
+                  },
+                  { 
+                    field: 'type', 
+                    headerName: 'Target',
+                    renderCell: (params) => (
+                      <Chip 
+                        label={params.value} 
+                        size="small" 
+                        color={params.value === 'maintenance' ? 'warning' : 'info'}
+                      />
+                    )
+                  },
+                  { 
+                    field: 'message', 
+                    headerName: 'Title',
+                    renderCell: (params) => (
+                      <Typography variant="body2" fontWeight="medium">
+                        {params.value}
+                      </Typography>
+                    )
+                  },
+                  { 
+                    field: 'status', 
+                    headerName: 'Status',
+                    renderCell: (params) => (
+                      <Chip 
+                        label="Active" 
+                        size="small" 
+                        color="success"
+                      />
+                    )
+                  }
+                ]}
+                rowActions={[
+                  { label: 'View', icon: <AssessmentIcon />, onClick: ({ row }) => console.log('View', row) },
+                  { label: 'Acknowledge', icon: <CheckCircleIcon />, onClick: ({ row }) => console.log('Acknowledge', row) },
+                  { label: 'Dismiss', icon: <WarningIcon />, onClick: ({ row }) => console.log('Dismiss', row) }
+                ]}
+                searchable
+                pagination
+              />
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Recent Maintenance Tasks */}
+        <Grid item xs={12} lg={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2 }}>Recent Maintenance Tasks</Typography>
+              <DataTable
+                data={tasks}
+                loading={false}
+                columns={[
+                  { 
+                    field: 'bus_id', 
+                    headerName: 'Bus',
+                    renderCell: (params) => {
+                      const bus = buses.find(b => b.bus_id === params.value);
+                      return (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <BusIcon fontSize="small" color="action" />
+                          <Typography variant="body2">
+                            {bus?.license_plate || params.value}
+                          </Typography>
+                        </Box>
+                      );
+                    }
+                  },
+                  { 
+                    field: 'title', 
+                    headerName: 'Task Type',
+                    renderCell: (params) => (
+                      <Typography variant="body2" fontWeight="medium">
+                        {params.value}
+                      </Typography>
+                    )
+                  },
+                  { 
+                    field: 'assigned_to', 
+                    headerName: 'Assignee',
+                    renderCell: (params) => {
+                      const staffMember = staff.find(s => s.user_id === params.value);
+                      return (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Avatar sx={{ width: 24, height: 24, fontSize: '0.75rem' }}>
+                            {staffMember?.name?.charAt(0)?.toUpperCase() || '?'}
+                          </Avatar>
+                          <Typography variant="body2">
+                            {staffMember?.name || 'Unassigned'}
+                          </Typography>
+                        </Box>
+                      );
+                    }
+                  },
+                  { 
+                    field: 'status', 
+                    headerName: 'Status',
+                    renderCell: (params) => (
+                      <Chip 
+                        label={params.value} 
+                        size="small" 
+                        color={params.value === 'completed' ? 'success' : params.value === 'pending' ? 'warning' : 'default'}
+                      />
+                    )
+                  },
+                  { 
+                    field: 'created_at', 
+                    headerName: 'Start Date',
+                    renderCell: (params) => (
+                      <Typography variant="body2" color="text.secondary">
+                        {new Date(params.value).toLocaleDateString()}
+                      </Typography>
+                    )
+                  },
+                  { 
+                    field: 'due_date', 
+                    headerName: 'End Date',
+                    renderCell: (params) => (
+                      <Typography variant="body2" color="text.secondary">
+                        {params.value ? new Date(params.value).toLocaleDateString() : 'N/A'}
+                      </Typography>
+                    )
+                  }
+                ]}
+                rowActions={[
+                  { label: 'Edit', icon: <AssessmentIcon />, onClick: ({ row }) => console.log('Edit', row) },
+                  { label: 'Complete', icon: <CheckCircleIcon />, onClick: ({ row }) => console.log('Complete', row) },
+                  { label: 'Cancel', icon: <WarningIcon />, onClick: ({ row }) => console.log('Cancel', row) }
+                ]}
+                searchable
+                pagination
+              />
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
 
-      <Grid item xs={12}>
-        <DashboardCard title="Recent Maintenance Tasks" variant="outlined">
-          <DataTable data={tasks} columns={[{ field: 'title', headerName: 'Task' }, { field: 'status', headerName: 'Status' }, { field: 'priority', headerName: 'Priority' }]} searchable pagination />
-        </DashboardCard>
-      </Grid>
-    </Grid>
+      {/* Assign Task Modal */}
+      <Dialog open={showAssignTask} onClose={() => setShowAssignTask(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Assign Task</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Bus/Vehicle</InputLabel>
+                <Select
+                  value={taskForm.bus_id}
+                  label="Bus/Vehicle"
+                  onChange={(e) => setTaskForm({...taskForm, bus_id: e.target.value})}
+                >
+                  <MenuItem value="">Select Bus...</MenuItem>
+                  {buses.map(b => (
+                    <MenuItem key={b.bus_id} value={b.bus_id}>
+                      {b.license_plate}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Task Type"
+                value={taskForm.title}
+                onChange={(e) => setTaskForm({...taskForm, title: e.target.value})}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Priority</InputLabel>
+                <Select
+                  value={taskForm.priority}
+                  label="Priority"
+                  onChange={(e) => setTaskForm({...taskForm, priority: e.target.value})}
+                >
+                  <MenuItem value="low">Low</MenuItem>
+                  <MenuItem value="medium">Medium</MenuItem>
+                  <MenuItem value="high">High</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Assignee</InputLabel>
+                <Select
+                  value={taskForm.staff_id}
+                  label="Assignee"
+                  onChange={(e) => setTaskForm({...taskForm, staff_id: e.target.value})}
+                >
+                  <MenuItem value="">Unassigned</MenuItem>
+                  {staff.map(s => (
+                    <MenuItem key={s.user_id} value={s.user_id}>
+                      {s.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Due Date"
+                type="date"
+                value={taskForm.dueDate}
+                onChange={(e) => setTaskForm({...taskForm, dueDate: e.target.value})}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Notes"
+                multiline
+                rows={3}
+                value={taskForm.notes}
+                onChange={(e) => setTaskForm({...taskForm, notes: e.target.value})}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowAssignTask(false)}>Cancel</Button>
+          <Button onClick={handleAssignTask} variant="contained">Assign</Button>
+        </DialogActions>
+      </Dialog>
 
-    <Dialog open={taskOpen} onClose={()=>setTaskOpen(false)} fullWidth maxWidth="sm">
-      <DialogTitle>Assign Task</DialogTitle>
-      <DialogContent>
-        <Select fullWidth displayEmpty size="small" value={form.bus_id} onChange={e=>setForm(f=>({ ...f, bus_id: e.target.value }))} sx={{ mt: 1 }}>
-          <MenuItem value="">Select Bus...</MenuItem>
-          {(buses||[]).map(b => <MenuItem key={b.bus_id} value={b.bus_id}>{b.license_plate}</MenuItem>)}
-        </Select>
-        <TextField fullWidth size="small" label="Task title" value={form.title} onChange={e=>setForm(f=>({ ...f, title: e.target.value }))} sx={{ mt: 2 }} />
-        <Select fullWidth displayEmpty size="small" value={form.priority} onChange={e=>setForm(f=>({ ...f, priority: e.target.value }))} sx={{ mt: 2 }}>
-          <MenuItem value="low">Low</MenuItem>
-          <MenuItem value="medium">Medium</MenuItem>
-          <MenuItem value="high">High</MenuItem>
-        </Select>
-        <Select fullWidth displayEmpty size="small" value={form.staff_id} onChange={e=>setForm(f=>({ ...f, staff_id: e.target.value }))} sx={{ mt: 2 }}>
-          <MenuItem value="">Assign to staff (optional)</MenuItem>
-          {(staff||[]).map(s => <MenuItem key={s.user_id} value={s.user_id}>{s.name}</MenuItem>)}
-        </Select>
-        <TextField fullWidth size="small" label="Notes" value={form.notes} onChange={e=>setForm(f=>({ ...f, notes: e.target.value }))} sx={{ mt: 2 }} />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={()=>setTaskOpen(false)}>Cancel</Button>
-        <Button variant="contained" onClick={async ()=>{ if(!form.bus_id || !form.title) return; await supabase.from('maintenance_tasks').insert([{ company_id: companyId, bus_id: form.bus_id, title: form.title, priority: form.priority, status: 'pending', notes: form.notes||null, assigned_to: form.staff_id||null }]); setTaskOpen(false); load(); }}>Save</Button>
-      </DialogActions>
-    </Dialog>
+      {/* Schedule Maintenance Modal */}
+      <Dialog open={showScheduleMaintenance} onClose={() => setShowScheduleMaintenance(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Schedule Maintenance</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Bus/Vehicle</InputLabel>
+                <Select
+                  value={scheduleForm.bus_id}
+                  label="Bus/Vehicle"
+                  onChange={(e) => setScheduleForm({...scheduleForm, bus_id: e.target.value})}
+                >
+                  <MenuItem value="">Select Bus...</MenuItem>
+                  {buses.map(b => (
+                    <MenuItem key={b.bus_id} value={b.bus_id}>
+                      {b.license_plate}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Maintenance Type</InputLabel>
+                <Select
+                  value={scheduleForm.maintenanceType}
+                  label="Maintenance Type"
+                  onChange={(e) => setScheduleForm({...scheduleForm, maintenanceType: e.target.value})}
+                >
+                  <MenuItem value="routine">Routine</MenuItem>
+                  <MenuItem value="preventive">Preventive</MenuItem>
+                  <MenuItem value="inspection">Inspection</MenuItem>
+                  <MenuItem value="repair">Repair</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Date"
+                type="date"
+                value={scheduleForm.date}
+                onChange={(e) => setScheduleForm({...scheduleForm, date: e.target.value})}
+                InputLabelProps={{ shrink: true }}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Workshop Bay"
+                value={scheduleForm.workshopBay}
+                onChange={(e) => setScheduleForm({...scheduleForm, workshopBay: e.target.value})}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowScheduleMaintenance(false)}>Cancel</Button>
+          <Button onClick={handleScheduleMaintenance} variant="contained">Schedule</Button>
+        </DialogActions>
+      </Dialog>
 
-    <Dialog open={schedOpen} onClose={()=>setSchedOpen(false)} fullWidth maxWidth="sm">
-      <DialogTitle>Schedule Maintenance</DialogTitle>
-      <DialogContent>
-        <Select fullWidth displayEmpty size="small" value={form.bus_id} onChange={e=>setForm(f=>({ ...f, bus_id: e.target.value }))} sx={{ mt: 1 }}>
-          <MenuItem value="">Select Bus...</MenuItem>
-          {(buses||[]).map(b => <MenuItem key={b.bus_id} value={b.bus_id}>{b.license_plate}</MenuItem>)}
-        </Select>
-        <TextField fullWidth size="small" label="Notes" value={form.notes} onChange={e=>setForm(f=>({ ...f, notes: e.target.value }))} sx={{ mt: 2 }} />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={()=>setSchedOpen(false)}>Cancel</Button>
-        <Button variant="contained" onClick={async ()=>{ if(!form.bus_id) return; await upsertMaintenanceLog({ bus_id: form.bus_id, notes: form.notes||null, status: 'scheduled' }); setSchedOpen(false); load(); }}>Schedule</Button>
-      </DialogActions>
-    </Dialog>
+      {/* Add Staff Modal */}
+      <Dialog open={showAddStaff} onClose={() => setShowAddStaff(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add Staff</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Name"
+                value={staffForm.name}
+                onChange={(e) => setStaffForm({...staffForm, name: e.target.value})}
+                required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Email"
+                type="email"
+                value={staffForm.email}
+                onChange={(e) => setStaffForm({...staffForm, email: e.target.value})}
+                required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Contact"
+                value={staffForm.contact}
+                onChange={(e) => setStaffForm({...staffForm, contact: e.target.value})}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Role</InputLabel>
+                <Select
+                  value={staffForm.role}
+                  label="Role"
+                  onChange={(e) => setStaffForm({...staffForm, role: e.target.value})}
+                >
+                  <MenuItem value="maintenance_tech">Maintenance Tech</MenuItem>
+                  <MenuItem value="maintenance_manager">Maintenance Manager</MenuItem>
+                  <MenuItem value="mechanic">Mechanic</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={staffForm.status}
+                  label="Status"
+                  onChange={(e) => setStaffForm({...staffForm, status: e.target.value})}
+                >
+                  <MenuItem value="Active">Active</MenuItem>
+                  <MenuItem value="Inactive">Inactive</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowAddStaff(false)}>Cancel</Button>
+          <Button onClick={handleAddStaff} variant="contained">Add Staff</Button>
+        </DialogActions>
+      </Dialog>
 
-    <Dialog open={staffOpen} onClose={()=>setStaffOpen(false)} fullWidth maxWidth="sm">
-      <DialogTitle>Add Staff</DialogTitle>
-      <DialogContent>
-        <TextField fullWidth size="small" label="Name" value={form.title} onChange={e=>setForm(f=>({ ...f, title: e.target.value }))} sx={{ mt: 1 }} />
-        <TextField fullWidth size="small" label="Email" value={form.notes} onChange={e=>setForm(f=>({ ...f, notes: e.target.value }))} sx={{ mt: 2 }} />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={()=>setStaffOpen(false)}>Cancel</Button>
-        <Button variant="contained" onClick={async ()=>{ if(!form.title || !form.notes) return; await supabase.from('users').insert([{ company_id: companyId, name: form.title, email: form.notes, role: 'maintenance_tech', is_active: true }]); setStaffOpen(false); load(); }}>Add</Button>
-      </DialogActions>
-    </Dialog>
-
-    <Dialog open={reportOpen} onClose={()=>setReportOpen(false)} fullWidth maxWidth="sm">
-      <DialogTitle>Generate Bus Report</DialogTitle>
-      <DialogContent>
-        <Select fullWidth displayEmpty size="small" value={form.bus_id} onChange={e=>setForm(f=>({ ...f, bus_id: e.target.value }))} sx={{ mt: 1 }}>
-          <MenuItem value="">Select Bus...</MenuItem>
-          {(buses||[]).map(b => <MenuItem key={b.bus_id} value={b.bus_id}>{b.license_plate}</MenuItem>)}
-        </Select>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={()=>setReportOpen(false)}>Cancel</Button>
-        <Button variant="contained" onClick={async ()=>{ if(!form.bus_id) return; await supabase.from('reports_queue').insert([{ company_id: companyId, type: 'bus_report', params: { bus_id: form.bus_id } }]); alert('Report generation queued'); setReportOpen(false); }}>Generate</Button>
-      </DialogActions>
-    </Dialog>
-    </>
+      {/* Generate Report Modal */}
+      <Dialog open={showGenerateReport} onClose={() => setShowGenerateReport(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Generate Report</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Report Type</InputLabel>
+                <Select
+                  value={reportForm.reportType}
+                  label="Report Type"
+                  onChange={(e) => setReportForm({...reportForm, reportType: e.target.value})}
+                >
+                  <MenuItem value="daily">Daily</MenuItem>
+                  <MenuItem value="weekly">Weekly</MenuItem>
+                  <MenuItem value="monthly">Monthly</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Bus Filter</InputLabel>
+                <Select
+                  value={reportForm.filters.bus}
+                  label="Bus Filter"
+                  onChange={(e) => setReportForm({...reportForm, filters: {...reportForm.filters, bus: e.target.value}})}
+                >
+                  <MenuItem value="">All Buses</MenuItem>
+                  {buses.map(b => (
+                    <MenuItem key={b.bus_id} value={b.bus_id}>
+                      {b.license_plate}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Task Status</InputLabel>
+                <Select
+                  value={reportForm.filters.taskStatus}
+                  label="Task Status"
+                  onChange={(e) => setReportForm({...reportForm, filters: {...reportForm.filters, taskStatus: e.target.value}})}
+                >
+                  <MenuItem value="">All Statuses</MenuItem>
+                  <MenuItem value="pending">Pending</MenuItem>
+                  <MenuItem value="in_progress">In Progress</MenuItem>
+                  <MenuItem value="completed">Completed</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Staff Filter</InputLabel>
+                <Select
+                  value={reportForm.filters.staff}
+                  label="Staff Filter"
+                  onChange={(e) => setReportForm({...reportForm, filters: {...reportForm.filters, staff: e.target.value}})}
+                >
+                  <MenuItem value="">All Staff</MenuItem>
+                  {staff.map(s => (
+                    <MenuItem key={s.user_id} value={s.user_id}>
+                      {s.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowGenerateReport(false)}>Cancel</Button>
+          <Button onClick={handleGenerateReport} variant="contained">Generate</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }
