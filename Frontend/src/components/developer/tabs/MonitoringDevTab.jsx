@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { Box, Grid, Card, CardContent, Typography, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControl, InputLabel, Select, MenuItem, Alert, IconButton, Tooltip, Tabs, Tab, LinearProgress } from '@mui/material';
+import { Visibility as ViewIcon, Flag as FlagIcon, Send as SendIcon, Assessment as AssessmentIcon, Download as DownloadIcon, Delete as DeleteIcon, Security as SecurityIcon, Error as ErrorIcon, Warning as WarningIcon, CheckCircle as CheckCircleIcon, Business as BusinessIcon, Person as PersonIcon, DirectionsBus as BusIcon, Receipt as ReceiptIcon, Route as RouteIcon } from '@mui/icons-material';
 import DashboardCard from '../../common/DashboardCard';
 import DataTable from '../../common/DataTable';
-import { getActivityLogGlobal } from '../../../supabase/api';
-import { Box } from '@mui/material';
+import { getActivityLogGlobal, getCompaniesLight } from '../../../supabase/api';
 import { ModernTextField, ModernButton } from '../../common/FormComponents';
 
 function toCSV(rows) {
@@ -13,46 +14,210 @@ function toCSV(rows) {
 }
 
 export default function MonitoringDevTab() {
-  const [rows, setRows] = useState([]);
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [errorLogs, setErrorLogs] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
-  const [typeSearch, setTypeSearch] = useState('');
-  const [messageSearch, setMessageSearch] = useState('');
+  const [activeTab, setActiveTab] = useState(0);
+  
+  // Filter states
+  const [logSearch, setLogSearch] = useState('');
+  const [logCompany, setLogCompany] = useState('');
+  const [logModule, setLogModule] = useState('');
+  const [logStatus, setLogStatus] = useState('');
+  const [logDateFrom, setLogDateFrom] = useState('');
+  const [logDateTo, setLogDateTo] = useState('');
+  
+  // Modal states
+  const [showLogDetails, setShowLogDetails] = useState(false);
+  const [showFlagModal, setShowFlagModal] = useState(false);
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [selectedLog, setSelectedLog] = useState(null);
+  
+  // System monitoring states
+  const [systemMetrics, setSystemMetrics] = useState({
+    activeCompanies: 0,
+    activeBuses: 0,
+    bookingsToday: 0,
+    transactionsToday: 0,
+    errorsToday: 0,
+    systemUptime: 99.9,
+    avgResponseTime: 150,
+    failedLogins: 0
+  });
 
   const load = async () => {
     setLoading(true);
-    const res = await getActivityLogGlobal();
-    setRows(res.data || []);
+    try {
+      const [activityRes, companiesRes] = await Promise.all([
+        getActivityLogGlobal(),
+        getCompaniesLight()
+      ]);
+      
+      setActivityLogs(activityRes.data || []);
+      setCompanies(companiesRes.data || []);
+      
+      // Mock error logs and system metrics - replace with actual API calls
+      const mockErrorLogs = [
+        {
+          id: 1,
+          timestamp: '2025-01-16T11:20:00Z',
+          severity: 'high',
+          module: 'Transactions',
+          error: 'Payment Gateway Timeout',
+          actionTaken: 'Retried',
+          details: 'Payment gateway response timeout after 30 seconds'
+        },
+        {
+          id: 2,
+          timestamp: '2025-01-16T11:35:00Z',
+          severity: 'medium',
+          module: 'Login',
+          error: 'Multiple Failed Logins',
+          actionTaken: 'Account Locked',
+          details: 'User admin@blue.com attempted login 5 times with wrong password'
+        }
+      ];
+      
+      setErrorLogs(mockErrorLogs);
+      setSystemMetrics({
+        activeCompanies: 120,
+        activeBuses: 350,
+        bookingsToday: 1250,
+        transactionsToday: 875000,
+        errorsToday: 14,
+        systemUptime: 99.9,
+        avgResponseTime: 150,
+        failedLogins: 3
+      });
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
-  const inRange = (d) => {
-    const ts = d ? new Date(d).getTime() : null;
-    const fromTs = fromDate ? new Date(fromDate).getTime() : null;
-    const toTs = toDate ? new Date(toDate).getTime() : null;
-    if (ts == null) return true;
-    if (fromTs != null && ts < fromTs) return false;
-    if (toTs != null && ts > toTs) return false;
-    return true;
-  };
-
-  const filtered = rows.filter(r => (
-    inRange(r.created_at) &&
-    ((typeSearch || '').trim() === '' ? true : (r.type || '').toLowerCase().includes(typeSearch.toLowerCase())) &&
-    ((messageSearch || '').trim() === '' ? true : (r.message || '').toLowerCase().includes(messageSearch.toLowerCase()))
+  const filteredActivityLogs = activityLogs.filter(log => (
+    (logSearch ? 
+      (log.message || '').toLowerCase().includes(logSearch.toLowerCase()) ||
+      (log.type || '').toLowerCase().includes(logSearch.toLowerCase())
+      : true) &&
+    (logCompany ? log.company_id === logCompany : true) &&
+    (logModule ? (log.type || '').toLowerCase().includes(logModule.toLowerCase()) : true) &&
+    (logDateFrom ? new Date(log.created_at) >= new Date(logDateFrom) : true) &&
+    (logDateTo ? new Date(log.created_at) <= new Date(logDateTo) : true)
   ));
 
-  const exportCSV = () => {
-    if (!filtered.length) return;
-    const csv = toCSV(filtered);
+  const filteredErrorLogs = errorLogs.filter(log => (
+    (logSearch ? 
+      log.error.toLowerCase().includes(logSearch.toLowerCase()) ||
+      log.module.toLowerCase().includes(logSearch.toLowerCase())
+      : true) &&
+    (logModule ? log.module === logModule : true) &&
+    (logDateFrom ? new Date(log.timestamp) >= new Date(logDateFrom) : true) &&
+    (logDateTo ? new Date(log.timestamp) <= new Date(logDateTo) : true)
+  ));
+
+  const handleViewLog = (log) => {
+    setSelectedLog(log);
+    setShowLogDetails(true);
+  };
+
+  const handleFlagSuspicious = (log) => {
+    setSelectedLog(log);
+    setShowFlagModal(true);
+  };
+
+  const handleSendAlert = (log) => {
+    setSelectedLog(log);
+    setShowAlertModal(true);
+  };
+
+  const handleClearLogs = async () => {
+    try {
+      // TODO: Implement clear logs functionality
+      console.log('Clearing logs...');
+      load();
+    } catch (error) {
+      console.error('Error clearing logs:', error);
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'success': return 'success';
+      case 'failed': return 'error';
+      case 'suspicious': return 'warning';
+      default: return 'default';
+    }
+  };
+
+  const getSeverityColor = (severity) => {
+    switch (severity?.toLowerCase()) {
+      case 'high': return 'error';
+      case 'medium': return 'warning';
+      case 'low': return 'info';
+      default: return 'default';
+    }
+  };
+
+  const getModuleIcon = (module) => {
+    switch (module?.toLowerCase()) {
+      case 'buses': return <BusIcon />;
+      case 'routes': return <RouteIcon />;
+      case 'bookings': return <ReceiptIcon />;
+      case 'transactions': return <ReceiptIcon />;
+      case 'login': return <SecurityIcon />;
+      default: return <AssessmentIcon />;
+    }
+  };
+
+  const activityActions = [
+    { 
+      label: 'View', 
+      icon: <ViewIcon />, 
+      onClick: ({ row }) => handleViewLog(row),
+      color: 'primary'
+    },
+    { 
+      label: 'Flag Suspicious', 
+      icon: <FlagIcon />, 
+      onClick: ({ row }) => handleFlagSuspicious(row),
+      color: 'warning'
+    },
+    { 
+      label: 'Send Alert', 
+      icon: <SendIcon />, 
+      onClick: ({ row }) => handleSendAlert(row),
+      color: 'info'
+    },
+  ];
+
+  const errorActions = [
+    { 
+      label: 'View', 
+      icon: <ViewIcon />, 
+      onClick: ({ row }) => handleViewLog(row),
+      color: 'primary'
+    },
+    { 
+      label: 'Flag for Review', 
+      icon: <FlagIcon />, 
+      onClick: ({ row }) => handleFlagSuspicious(row),
+      color: 'warning'
+    },
+  ];
+
+  const exportLogs = () => {
+    const logsToExport = activeTab === 0 ? filteredActivityLogs : filteredErrorLogs;
+    if (!logsToExport.length) return;
+    const csv = toCSV(logsToExport);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'monitoring_logs.csv';
+    a.download = `${activeTab === 0 ? 'activity' : 'error'}_logs.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
