@@ -1,212 +1,605 @@
 import React, { useEffect, useState } from 'react';
-import DashboardCard from '../../common/DashboardCard';
+import { Box, Card, CardContent, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControl, InputLabel, Select, MenuItem, Chip, IconButton, Avatar, Grid, FormControlLabel, Switch } from '@mui/material';
+import { Add as AddIcon, Schedule as ScheduleIcon, Visibility as VisibilityIcon, Edit as EditIcon, Notifications as NotificationsIcon, QrCodeScanner as QrCodeScannerIcon, CameraAlt as CameraAltIcon } from '@mui/icons-material';
 import DataTable from '../../common/DataTable';
-import { ModernButton } from '../../common/FormComponents';
 import { supabase } from '../../../supabase/client';
-import { Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Typography } from '@mui/material';
 
 export default function AttendanceTab() {
-  const [rows, setRows] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [scanOpen, setScanOpen] = useState(false);
-  const [scanOutOpen, setScanOutOpen] = useState(false);
-  const [kioskOpen, setKioskOpen] = useState(false);
-  const [kioskMode, setKioskMode] = useState('in');
-  const [staffId, setStaffId] = useState('');
-  const [ticketText, setTicketText] = useState('');
-  const [cameraLoaded, setCameraLoaded] = useState(false);
+  const [attendance, setAttendance] = useState([]);
+  const [staff, setStaff] = useState([]);
+  const [loading, setLoading] = useState(false);
   const companyId = window.companyId || localStorage.getItem('companyId');
-  useEffect(() => { (async () => { const { data } = await supabase.from('attendance').select('id, staff_id, check_in, check_out, status').eq('company_id', companyId).order('check_in', { ascending: false }); setRows(data||[]); })(); }, [companyId]);
-  const reload = async () => { const { data } = await supabase.from('attendance').select('id, staff_id, check_in, check_out, status').eq('company_id', companyId).order('check_in', { ascending: false }); setRows(data||[]); };
+  
+  // Modal states
+  const [showAddAttendance, setShowAddAttendance] = useState(false);
+  const [showScheduleShift, setShowScheduleShift] = useState(false);
+  const [showEditAttendance, setShowEditAttendance] = useState(false);
+  const [showNotifyEmployee, setShowNotifyEmployee] = useState(false);
+  const [selectedAttendance, setSelectedAttendance] = useState(null);
+  
+  // Form states
+  const [attendanceForm, setAttendanceForm] = useState({
+    employee: '',
+    date: new Date().toISOString().split('T')[0],
+    checkInTime: '',
+    checkOutTime: '',
+    status: 'Present'
+  });
+  
+  const [shiftForm, setShiftForm] = useState({
+    employee: '',
+    department: '',
+    shiftStartTime: '',
+    shiftEndTime: '',
+    repeat: 'None'
+  });
+  
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [dateRangeFilter, setDateRangeFilter] = useState({
+    start: '',
+    end: ''
+  });
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [{ data: attendanceData }, { data: staffData }] = await Promise.all([
+        supabase
+          .from('attendance')
+          .select(`
+            id, staff_id, check_in, check_out, status, created_at,
+            users!inner(name, department, role)
+          `)
+          .eq('company_id', companyId)
+          .order('check_in', { ascending: false }),
+        supabase
+          .from('users')
+          .select('user_id, name, department, role, is_active')
+          .eq('company_id', companyId)
+          .eq('is_active', true)
+      ]);
+      
+      // Transform attendance data to include employee names
+      const transformedAttendance = (attendanceData || []).map(record => ({
+        ...record,
+        employee: record.users?.name || 'Unknown',
+        department: record.users?.department || 'N/A',
+        role: record.users?.role || 'N/A'
+      }));
+      
+      setAttendance(transformedAttendance);
+      setStaff(staffData || []);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!scanOpen) return;
-    let cancelled = false;
-    let scriptEl = null;
-    let scanner = null;
-    const startScanner = () => {
-      try {
-        if (!window.Html5QrcodeScanner) return;
-        const el = document.getElementById('hr-qr-reader');
-        if (!el) return;
-        const ScannerCtor = window.Html5QrcodeScanner;
-        scanner = new ScannerCtor('hr-qr-reader', { fps: 10, qrbox: 220, rememberLastUsedCamera: true });
-        scanner.render(async (decodedText) => {
-          try {
-            if (!decodedText) return;
-            setTicketText(decodedText);
-            await supabase.from('attendance').insert([{ company_id: companyId, staff_id: decodedText, check_in: new Date().toISOString(), status: 'present' }]);
-            setScanOpen(false);
-            setTicketText('');
-            reload();
-          } catch {
-            // ignore; keep scanner running
-          }
-        }, () => {});
-      } catch {}
-    };
-    if (!window.Html5QrcodeScanner) {
-      scriptEl = document.createElement('script');
-      scriptEl.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.10/minified/html5-qrcode.min.js';
-      scriptEl.async = true;
-      scriptEl.onload = () => { if (!cancelled) { setCameraLoaded(true); setTimeout(startScanner, 200); } };
-      document.body.appendChild(scriptEl);
-    } else {
-      setCameraLoaded(true);
-      setTimeout(startScanner, 200);
-    }
-    return () => { cancelled = true; try { scanner?.clear(); } catch {} if (scriptEl) { try { scriptEl.onload = null; } catch {} } };
-  }, [scanOpen, companyId]);
+    loadData();
+  }, [companyId]);
 
-  useEffect(() => {
-    if (!scanOutOpen) return;
-    let cancelled = false;
-    let scriptEl = null;
-    let scanner = null;
-    const startScanner = () => {
-      try {
-        if (!window.Html5QrcodeScanner) return;
-        const el = document.getElementById('hr-qr-reader-out');
-        if (!el) return;
-        const ScannerCtor = window.Html5QrcodeScanner;
-        scanner = new ScannerCtor('hr-qr-reader-out', { fps: 10, qrbox: 220, rememberLastUsedCamera: true });
-        scanner.render(async (decodedText) => {
-          try {
-            if (!decodedText) return;
-            // Find latest open attendance for this staff and check-out
-            const { data: openRows } = await supabase
-              .from('attendance')
-              .select('id, staff_id, check_in, check_out')
-              .eq('company_id', companyId)
-              .eq('staff_id', decodedText)
-              .is('check_out', null)
-              .order('check_in', { ascending: false })
-              .limit(1);
-            const row = Array.isArray(openRows) ? openRows[0] : null;
-            if (!row) { alert('No active check-in found for this staff'); return; }
-            await supabase.from('attendance').update({ check_out: new Date().toISOString(), status: 'completed' }).eq('id', row.id);
-            setScanOutOpen(false);
-            reload();
-          } catch {}
-        }, () => {});
-      } catch {}
-    };
-    if (!window.Html5QrcodeScanner) {
-      scriptEl = document.createElement('script');
-      scriptEl.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.10/minified/html5-qrcode.min.js';
-      scriptEl.async = true;
-      scriptEl.onload = () => { if (!cancelled) { setCameraLoaded(true); setTimeout(startScanner, 200); } };
-      document.body.appendChild(scriptEl);
-    } else {
-      setCameraLoaded(true);
-      setTimeout(startScanner, 200);
+  const handleAddAttendance = async () => {
+    try {
+      if (!attendanceForm.employee || !attendanceForm.date) return;
+      await supabase.from('attendance').insert([{
+        company_id: companyId,
+        staff_id: attendanceForm.employee,
+        check_in: new Date(`${attendanceForm.date}T${attendanceForm.checkInTime || '09:00'}`).toISOString(),
+        check_out: attendanceForm.checkOutTime ? new Date(`${attendanceForm.date}T${attendanceForm.checkOutTime}`).toISOString() : null,
+        status: attendanceForm.status.toLowerCase()
+      }]);
+      setShowAddAttendance(false);
+      setAttendanceForm({
+        employee: '',
+        date: new Date().toISOString().split('T')[0],
+        checkInTime: '',
+        checkOutTime: '',
+        status: 'Present'
+      });
+      loadData();
+    } catch (error) {
+      console.error('Error adding attendance:', error);
     }
-    return () => { cancelled = true; try { scanner?.clear(); } catch {} if (scriptEl) { try { scriptEl.onload = null; } catch {} } };
-  }, [scanOutOpen, companyId]);
+  };
 
-  useEffect(() => {
-    if (!kioskOpen) return;
-    let cancelled = false;
-    let scriptEl = null;
-    let scanner = null;
-    const handleDecoded = async (code) => {
-      try {
-        if (!code) return;
-        if (kioskMode === 'in') {
-          await supabase.from('attendance').insert([{ company_id: companyId, staff_id: code, check_in: new Date().toISOString(), status: 'present' }]);
-        } else {
-          const { data: openRows } = await supabase
-            .from('attendance')
-            .select('id, staff_id, check_in, check_out')
-            .eq('company_id', companyId)
-            .eq('staff_id', code)
-            .is('check_out', null)
-            .order('check_in', { ascending: false })
-            .limit(1);
-          const row = Array.isArray(openRows) ? openRows[0] : null;
-          if (!row) { alert('No active check-in found'); return; }
-          await supabase.from('attendance').update({ check_out: new Date().toISOString(), status: 'completed' }).eq('id', row.id);
-        }
-        reload();
-      } catch {}
-    };
-    const startScanner = () => {
-      try {
-        if (!window.Html5QrcodeScanner) return;
-        const el = document.getElementById('hr-qr-reader-kiosk');
-        if (!el) return;
-        const ScannerCtor = window.Html5QrcodeScanner;
-        scanner = new ScannerCtor('hr-qr-reader-kiosk', { fps: 10, qrbox: 220, rememberLastUsedCamera: true });
-        scanner.render((decodedText) => { handleDecoded(decodedText); }, () => {});
-      } catch {}
-    };
-    if (!window.Html5QrcodeScanner) {
-      scriptEl = document.createElement('script');
-      scriptEl.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.10/minified/html5-qrcode.min.js';
-      scriptEl.async = true;
-      scriptEl.onload = () => { if (!cancelled) { setCameraLoaded(true); setTimeout(startScanner, 200); } };
-      document.body.appendChild(scriptEl);
-    } else {
-      setCameraLoaded(true);
-      setTimeout(startScanner, 200);
+  const handleScheduleShift = async () => {
+    try {
+      if (!shiftForm.employee || !shiftForm.shiftStartTime || !shiftForm.shiftEndTime) return;
+      // TODO: Implement shift scheduling functionality
+      console.log('Scheduling shift:', shiftForm);
+      setShowScheduleShift(false);
+      setShiftForm({
+        employee: '',
+        department: '',
+        shiftStartTime: '',
+        shiftEndTime: '',
+        repeat: 'None'
+      });
+    } catch (error) {
+      console.error('Error scheduling shift:', error);
     }
-    return () => { cancelled = true; try { scanner?.clear(); } catch {} if (scriptEl) { try { scriptEl.onload = null; } catch {} } };
-  }, [kioskOpen, kioskMode, companyId]);
+  };
+
+  const handleEditAttendance = async () => {
+    try {
+      if (!selectedAttendance) return;
+      await supabase.from('attendance').update({
+        check_in: new Date(`${attendanceForm.date}T${attendanceForm.checkInTime}`).toISOString(),
+        check_out: attendanceForm.checkOutTime ? new Date(`${attendanceForm.date}T${attendanceForm.checkOutTime}`).toISOString() : null,
+        status: attendanceForm.status.toLowerCase()
+      }).eq('id', selectedAttendance.id);
+      setShowEditAttendance(false);
+      setSelectedAttendance(null);
+      loadData();
+    } catch (error) {
+      console.error('Error editing attendance:', error);
+    }
+  };
+
+  const handleNotifyEmployee = async (attendanceRecord) => {
+    try {
+      // TODO: Implement notification functionality
+      console.log('Notifying employee:', attendanceRecord);
+      alert('Notification functionality to be implemented');
+    } catch (error) {
+      console.error('Error notifying employee:', error);
+    }
+  };
+
+  const handleEditAttendanceRecord = (record) => {
+    setSelectedAttendance(record);
+    setAttendanceForm({
+      employee: record.staff_id,
+      date: new Date(record.check_in).toISOString().split('T')[0],
+      checkInTime: new Date(record.check_in).toTimeString().slice(0, 5),
+      checkOutTime: record.check_out ? new Date(record.check_out).toTimeString().slice(0, 5) : '',
+      status: record.status.charAt(0).toUpperCase() + record.status.slice(1)
+    });
+    setShowEditAttendance(true);
+  };
+
+  const filteredAttendance = attendance.filter(record => 
+    (searchTerm ? record.employee?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                   record.department?.toLowerCase().includes(searchTerm.toLowerCase()) : true) &&
+    (departmentFilter ? record.department === departmentFilter : true) &&
+    (statusFilter ? record.status === statusFilter : true) &&
+    (roleFilter ? record.role === roleFilter : true) &&
+    (dateRangeFilter.start ? new Date(record.check_in) >= new Date(dateRangeFilter.start) : true) &&
+    (dateRangeFilter.end ? new Date(record.check_in) <= new Date(dateRangeFilter.end) : true)
+  );
+
   return (
-    <DashboardCard title="Attendance & Shift Scheduling" variant="outlined" headerAction={<Box sx={{ display: 'flex', gap: 1 }}><ModernButton icon="add" onClick={()=>setOpen(true)}>Check staff in</ModernButton><ModernButton icon="qr" onClick={()=>setScanOpen(true)}>Scan to check-in</ModernButton><ModernButton icon="qr" onClick={()=>setScanOutOpen(true)}>Scan to check-out</ModernButton><ModernButton icon="camera" onClick={()=>setKioskOpen(true)}>Open kiosk</ModernButton></Box>}>
-      <DataTable data={rows} columns={[{ field: 'check_in', headerName: 'Check-in', type: 'date' }, { field: 'check_out', headerName: 'Check-out', type: 'date' }, { field: 'status', headerName: 'Status' }]} searchable pagination rowActions={[{ label: 'Check staff out', icon: 'check', onClick: async (row)=>{ await supabase.from('attendance').update({ check_out: new Date().toISOString(), status: 'completed' }).eq('id', row.id); reload(); } }]} />
-      <Dialog open={open} onClose={()=>setOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Check staff in</DialogTitle>
+    <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1">
+          Attendance & Shift Scheduling
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="outlined"
+            startIcon={<ScheduleIcon />}
+            onClick={() => setShowScheduleShift(true)}
+          >
+            Schedule Shift
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setShowAddAttendance(true)}
+          >
+            Add Attendance Entry
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Search and Filters */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={3}>
+              <TextField
+                fullWidth
+                placeholder="Search by Employee Name or Department"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Department</InputLabel>
+                <Select
+                  value={departmentFilter}
+                  label="Department"
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                >
+                  <MenuItem value="">All Departments</MenuItem>
+                  <MenuItem value="Operations">Operations</MenuItem>
+                  <MenuItem value="Maintenance">Maintenance</MenuItem>
+                  <MenuItem value="Booking">Booking</MenuItem>
+                  <MenuItem value="Admin">Admin</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={statusFilter}
+                  label="Status"
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <MenuItem value="">All Status</MenuItem>
+                  <MenuItem value="present">Present</MenuItem>
+                  <MenuItem value="absent">Absent</MenuItem>
+                  <MenuItem value="late">Late</MenuItem>
+                  <MenuItem value="on_leave">On Leave</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Role</InputLabel>
+                <Select
+                  value={roleFilter}
+                  label="Role"
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                >
+                  <MenuItem value="">All Roles</MenuItem>
+                  <MenuItem value="driver">Driver</MenuItem>
+                  <MenuItem value="staff">Staff</MenuItem>
+                  <MenuItem value="admin">Admin</MenuItem>
+                  <MenuItem value="booking_officer">Booking Officer</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Grid container spacing={1}>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="Start Date"
+                    type="date"
+                    value={dateRangeFilter.start}
+                    onChange={(e) => setDateRangeFilter({...dateRangeFilter, start: e.target.value})}
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="End Date"
+                    type="date"
+                    value={dateRangeFilter.end}
+                    onChange={(e) => setDateRangeFilter({...dateRangeFilter, end: e.target.value})}
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+              </Grid>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* Attendance Table */}
+      <Card>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2 }}>Attendance Records</Typography>
+          <DataTable
+            data={filteredAttendance}
+            loading={loading}
+            columns={[
+              { 
+                field: 'employee', 
+                headerName: 'Employee',
+                renderCell: (params) => (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Avatar sx={{ width: 32, height: 32, fontSize: '0.875rem' }}>
+                      {params.value?.charAt(0)?.toUpperCase()}
+                    </Avatar>
+                    <Typography variant="body2" fontWeight="medium">
+                      {params.value}
+                    </Typography>
+                  </Box>
+                )
+              },
+              { 
+                field: 'department', 
+                headerName: 'Department',
+                renderCell: (params) => (
+                  <Typography variant="body2">
+                    {params.value}
+                  </Typography>
+                )
+              },
+              { 
+                field: 'check_in', 
+                headerName: 'Date',
+                renderCell: (params) => (
+                  <Typography variant="body2" color="text.secondary">
+                    {new Date(params.value).toLocaleDateString()}
+                  </Typography>
+                )
+              },
+              { 
+                field: 'check_in', 
+                headerName: 'Check-in',
+                renderCell: (params) => (
+                  <Typography variant="body2" color="text.secondary">
+                    {new Date(params.value).toLocaleTimeString()}
+                  </Typography>
+                )
+              },
+              { 
+                field: 'check_out', 
+                headerName: 'Check-out',
+                renderCell: (params) => (
+                  <Typography variant="body2" color="text.secondary">
+                    {params.value ? new Date(params.value).toLocaleTimeString() : 'N/A'}
+                  </Typography>
+                )
+              },
+              { 
+                field: 'status', 
+                headerName: 'Status',
+                renderCell: (params) => (
+                  <Chip 
+                    label={params.value} 
+                    size="small" 
+                    color={params.value === 'present' ? 'success' : params.value === 'late' ? 'warning' : params.value === 'absent' ? 'error' : 'default'}
+                  />
+                )
+              }
+            ]}
+            rowActions={[
+              { label: 'Edit Attendance', icon: <EditIcon />, onClick: ({ row }) => handleEditAttendanceRecord(row) },
+              { label: 'Notify Employee', icon: <NotificationsIcon />, onClick: ({ row }) => handleNotifyEmployee(row) }
+            ]}
+            searchable
+            pagination
+          />
+        </CardContent>
+      </Card>
+
+      {/* Add Attendance Modal */}
+      <Dialog open={showAddAttendance} onClose={() => setShowAddAttendance(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add Attendance Entry</DialogTitle>
         <DialogContent>
-          <TextField fullWidth size="small" label="Staff user_id" value={staffId} onChange={e=>setStaffId(e.target.value)} sx={{ mt: 1 }} />
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Employee</InputLabel>
+                <Select
+                  value={attendanceForm.employee}
+                  label="Employee"
+                  onChange={(e) => setAttendanceForm({...attendanceForm, employee: e.target.value})}
+                >
+                  {staff.map(emp => (
+                    <MenuItem key={emp.user_id} value={emp.user_id}>
+                      {emp.name} ({emp.department})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Date"
+                type="date"
+                value={attendanceForm.date}
+                onChange={(e) => setAttendanceForm({...attendanceForm, date: e.target.value})}
+                InputLabelProps={{ shrink: true }}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Check-in Time"
+                type="time"
+                value={attendanceForm.checkInTime}
+                onChange={(e) => setAttendanceForm({...attendanceForm, checkInTime: e.target.value})}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Check-out Time"
+                type="time"
+                value={attendanceForm.checkOutTime}
+                onChange={(e) => setAttendanceForm({...attendanceForm, checkOutTime: e.target.value})}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={attendanceForm.status}
+                  label="Status"
+                  onChange={(e) => setAttendanceForm({...attendanceForm, status: e.target.value})}
+                >
+                  <MenuItem value="Present">Present</MenuItem>
+                  <MenuItem value="Absent">Absent</MenuItem>
+                  <MenuItem value="Late">Late</MenuItem>
+                  <MenuItem value="On Leave">On Leave</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={()=>setOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={async ()=>{ if(!staffId) return; await supabase.from('attendance').insert([{ company_id: companyId, staff_id: staffId, check_in: new Date().toISOString(), status: 'present' }]); setOpen(false); setStaffId(''); reload(); }}>Check-in</Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog open={scanOpen} onClose={()=>setScanOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Scan to Check-in</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ mb: 1 }}>Scan a staff QR/ID or enter manually.</Typography>
-          <div id="hr-qr-reader" style={{ width: '100%', display: cameraLoaded ? 'block' : 'none' }} />
-          {!cameraLoaded && <Typography variant="caption" color="text.secondary">Loading camera…</Typography>}
-          <TextField fullWidth size="small" label="Staff ID / Code" value={ticketText} onChange={e=>setTicketText(e.target.value)} />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={()=>setScanOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={async ()=>{ if(!ticketText) return; await supabase.from('attendance').insert([{ company_id: companyId, staff_id: ticketText, check_in: new Date().toISOString(), status: 'present' }]); setScanOpen(false); setTicketText(''); reload(); }}>Check-in</Button>
+          <Button onClick={() => setShowAddAttendance(false)}>Cancel</Button>
+          <Button onClick={handleAddAttendance} variant="contained">Save</Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={scanOutOpen} onClose={()=>setScanOutOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Scan to Check-out</DialogTitle>
+      {/* Schedule Shift Modal */}
+      <Dialog open={showScheduleShift} onClose={() => setShowScheduleShift(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Schedule Shift</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" sx={{ mb: 1 }}>Scan a staff QR/ID or enter manually.</Typography>
-          <div id="hr-qr-reader-out" style={{ width: '100%', display: cameraLoaded ? 'block' : 'none' }} />
-          {!cameraLoaded && <Typography variant="caption" color="text.secondary">Loading camera…</Typography>}
-          <TextField fullWidth size="small" label="Staff ID / Code" value={ticketText} onChange={e=>setTicketText(e.target.value)} />
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Employee</InputLabel>
+                <Select
+                  value={shiftForm.employee}
+                  label="Employee"
+                  onChange={(e) => {
+                    const selectedEmp = staff.find(emp => emp.user_id === e.target.value);
+                    setShiftForm({
+                      ...shiftForm, 
+                      employee: e.target.value,
+                      department: selectedEmp?.department || ''
+                    });
+                  }}
+                >
+                  {staff.map(emp => (
+                    <MenuItem key={emp.user_id} value={emp.user_id}>
+                      {emp.name} ({emp.department})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Department"
+                value={shiftForm.department}
+                onChange={(e) => setShiftForm({...shiftForm, department: e.target.value})}
+                disabled
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Shift Start Time"
+                type="time"
+                value={shiftForm.shiftStartTime}
+                onChange={(e) => setShiftForm({...shiftForm, shiftStartTime: e.target.value})}
+                InputLabelProps={{ shrink: true }}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Shift End Time"
+                type="time"
+                value={shiftForm.shiftEndTime}
+                onChange={(e) => setShiftForm({...shiftForm, shiftEndTime: e.target.value})}
+                InputLabelProps={{ shrink: true }}
+                required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Repeat</InputLabel>
+                <Select
+                  value={shiftForm.repeat}
+                  label="Repeat"
+                  onChange={(e) => setShiftForm({...shiftForm, repeat: e.target.value})}
+                >
+                  <MenuItem value="None">None</MenuItem>
+                  <MenuItem value="Daily">Daily</MenuItem>
+                  <MenuItem value="Weekly">Weekly</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={()=>setScanOutOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={async ()=>{ if(!ticketText) return; const { data: openRows } = await supabase.from('attendance').select('id').eq('company_id', companyId).eq('staff_id', ticketText).is('check_out', null).order('check_in', { ascending: false }).limit(1); const row = Array.isArray(openRows) ? openRows[0] : null; if (!row) { alert('No active check-in found'); return; } await supabase.from('attendance').update({ check_out: new Date().toISOString(), status: 'completed' }).eq('id', row.id); setScanOutOpen(false); setTicketText(''); reload(); }}>Check-out</Button>
+          <Button onClick={() => setShowScheduleShift(false)}>Cancel</Button>
+          <Button onClick={handleScheduleShift} variant="contained">Save</Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={kioskOpen} onClose={()=>setKioskOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>HR Kiosk</DialogTitle>
+      {/* Edit Attendance Modal */}
+      <Dialog open={showEditAttendance} onClose={() => setShowEditAttendance(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Attendance</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-            <Button variant={kioskMode==='in'?'contained':'outlined'} onClick={()=>setKioskMode('in')}>Check-in mode</Button>
-            <Button variant={kioskMode==='out'?'contained':'outlined'} onClick={()=>setKioskMode('out')}>Check-out mode</Button>
-          </Box>
-          <div id="hr-qr-reader-kiosk" style={{ width: '100%' }} />
-          <Typography variant="caption" color="text.secondary">Kiosk stays active for continuous scanning. Use the buttons to switch mode.</Typography>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Employee</InputLabel>
+                <Select
+                  value={attendanceForm.employee}
+                  label="Employee"
+                  onChange={(e) => setAttendanceForm({...attendanceForm, employee: e.target.value})}
+                  disabled
+                >
+                  {staff.map(emp => (
+                    <MenuItem key={emp.user_id} value={emp.user_id}>
+                      {emp.name} ({emp.department})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Date"
+                type="date"
+                value={attendanceForm.date}
+                onChange={(e) => setAttendanceForm({...attendanceForm, date: e.target.value})}
+                InputLabelProps={{ shrink: true }}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Check-in Time"
+                type="time"
+                value={attendanceForm.checkInTime}
+                onChange={(e) => setAttendanceForm({...attendanceForm, checkInTime: e.target.value})}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Check-out Time"
+                type="time"
+                value={attendanceForm.checkOutTime}
+                onChange={(e) => setAttendanceForm({...attendanceForm, checkOutTime: e.target.value})}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={attendanceForm.status}
+                  label="Status"
+                  onChange={(e) => setAttendanceForm({...attendanceForm, status: e.target.value})}
+                >
+                  <MenuItem value="Present">Present</MenuItem>
+                  <MenuItem value="Absent">Absent</MenuItem>
+                  <MenuItem value="Late">Late</MenuItem>
+                  <MenuItem value="On Leave">On Leave</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={()=>setKioskOpen(false)}>Close</Button>
+          <Button onClick={() => setShowEditAttendance(false)}>Cancel</Button>
+          <Button onClick={handleEditAttendance} variant="contained">Save</Button>
         </DialogActions>
       </Dialog>
-    </DashboardCard>
+    </Box>
   );
 }
