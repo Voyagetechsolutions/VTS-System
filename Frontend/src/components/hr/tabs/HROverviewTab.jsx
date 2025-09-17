@@ -312,6 +312,23 @@ export default function HROverviewTab() {
             </CardContent>
           </Card>
         </Grid>
+        <Grid item xs={6} sm={3} md={2}>
+          <Card sx={{ 
+            textAlign: 'center', 
+            p: 2, 
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 }
+          }}>
+            <CardContent>
+              <DescriptionIcon sx={{ fontSize: 40, color: 'info.main', mb: 1 }} />
+              <Typography variant="h4" color="info.main" fontWeight="bold">
+                {kpis.openings}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">Open Positions</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
 
       {/* Quick Actions */}
@@ -415,79 +432,206 @@ export default function HROverviewTab() {
         </Grid>
       </Grid>
 
-      {/* Employees Table */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>Employees</Typography>
-          <DataTable
-            data={filteredEmployees}
-            loading={false}
-            columns={[
-              { 
-                field: 'name', 
-                headerName: 'Name',
-                renderCell: (params) => (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Avatar sx={{ width: 32, height: 32, fontSize: '0.875rem' }}>
-                      {params.value?.charAt(0)?.toUpperCase()}
-                    </Avatar>
-                    <Typography variant="body2" fontWeight="medium">
-                      {params.value}
-                    </Typography>
-                  </Box>
-                )
-              },
-              { 
-                field: 'role', 
-                headerName: 'Role',
-                renderCell: (params) => (
-                  <Chip 
-                    label={params.value} 
-                    size="small" 
-                    color={params.value === 'driver' ? 'primary' : 'default'}
-                  />
-                )
-              },
-              { 
-                field: 'department', 
-                headerName: 'Department',
-                renderCell: (params) => (
-                  <Typography variant="body2">
-                    {params.value || 'N/A'}
-                  </Typography>
-                )
-              },
-              { 
-                field: 'is_active', 
-                headerName: 'Status',
-                renderCell: (params) => (
-                  <Chip 
-                    label={params.value ? 'Active' : 'Inactive'} 
-                    size="small" 
-                    color={params.value ? 'success' : 'error'}
-                  />
-                )
-              },
-              { 
-                field: 'email', 
-                headerName: 'Email',
-                renderCell: (params) => (
-                  <Typography variant="body2" color="text.secondary">
-                    {params.value}
-                  </Typography>
-                )
-              },
-            ]}
-            rowActions={[
-              { label: 'View Profile', icon: <AddIcon />, onClick: ({ row }) => console.log('View', row) },
-              { label: 'Edit', icon: <AddIcon />, onClick: ({ row }) => console.log('Edit', row) },
-              { label: 'Toggle Status', icon: <AddIcon />, onClick: ({ row }) => console.log('Toggle', row) }
-            ]}
-            searchable
-            pagination
-          />
-        </CardContent>
-      </Card>
+      {/* Main Tables */}
+      <Grid container spacing={3}>
+        {/* Employees Table */}
+        <Grid item xs={12} lg={8}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2 }}>Employees</Typography>
+              <DataTable
+                data={filteredEmployees}
+                loading={false}
+                columns={[
+                  { 
+                    field: 'name', 
+                    headerName: 'Name',
+                    renderCell: (params) => (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Avatar sx={{ width: 32, height: 32, fontSize: '0.875rem' }}>
+                          {params.value?.charAt(0)?.toUpperCase()}
+                        </Avatar>
+                        <Typography variant="body2" fontWeight="medium">
+                          {params.value}
+                        </Typography>
+                      </Box>
+                    )
+                  },
+                  { 
+                    field: 'role', 
+                    headerName: 'Role',
+                    renderCell: (params) => (
+                      <Chip 
+                        label={params.value} 
+                        size="small" 
+                        color={params.value === 'driver' ? 'primary' : 'default'}
+                      />
+                    )
+                  },
+                  { 
+                    field: 'department', 
+                    headerName: 'Department',
+                    renderCell: (params) => (
+                      <Typography variant="body2">
+                        {params.value || 'N/A'}
+                      </Typography>
+                    )
+                  },
+                  { 
+                    field: 'is_active', 
+                    headerName: 'Status',
+                    renderCell: (params) => (
+                      <Chip 
+                        label={params.value ? 'Active' : 'Inactive'} 
+                        size="small" 
+                        color={params.value ? 'success' : 'error'}
+                      />
+                    )
+                  },
+                  { 
+                    field: 'email', 
+                    headerName: 'Email',
+                    renderCell: (params) => (
+                      <Typography variant="body2" color="text.secondary">
+                        {params.value}
+                      </Typography>
+                    )
+                  },
+                ]}
+                rowActions={[
+                  { label: 'View Profile', icon: <AddIcon />, onClick: ({ row }) => console.log('View', row) },
+                  { label: 'Edit', icon: <AddIcon />, onClick: ({ row }) => console.log('Edit', row) },
+                  { label: 'Toggle Status', icon: <AddIcon />, onClick: ({ row }) => console.log('Toggle', row) }
+                ]}
+                searchable
+                pagination
+              />
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Department Summary */}
+        <Grid item xs={12} lg={4}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2 }}>Department Summary</Typography>
+              <DataTable
+                data={deptSummary}
+                loading={false}
+                columns={[
+                  { 
+                    field: 'dept', 
+                    headerName: 'Department',
+                    renderCell: (params) => (
+                      <Typography variant="body2" fontWeight="medium">
+                        {params.value}
+                      </Typography>
+                    )
+                  },
+                  { 
+                    field: 'users', 
+                    headerName: 'Employees',
+                    renderCell: (params) => (
+                      <Typography variant="body2" color="primary">
+                        {params.value}
+                      </Typography>
+                    )
+                  },
+                  { 
+                    field: 'checkedIn', 
+                    headerName: 'Active Today',
+                    renderCell: (params) => (
+                      <Chip 
+                        label={params.value} 
+                        size="small" 
+                        color="success"
+                      />
+                    )
+                  },
+                  { 
+                    field: 'bookings', 
+                    headerName: 'Bookings',
+                    renderCell: (params) => (
+                      <Typography variant="body2" color="text.secondary">
+                        {params.value}
+                      </Typography>
+                    )
+                  },
+                  { 
+                    field: 'maintenance', 
+                    headerName: 'Maintenance',
+                    renderCell: (params) => (
+                      <Typography variant="body2" color="text.secondary">
+                        {params.value}
+                      </Typography>
+                    )
+                  }
+                ]}
+                searchable={false}
+                pagination={false}
+              />
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Daily Check-ins */}
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2 }}>Daily Check-ins</Typography>
+              <DataTable
+                data={dailyCheckins}
+                loading={false}
+                columns={[
+                  { 
+                    field: 'employee', 
+                    headerName: 'Employee',
+                    renderCell: (params) => (
+                      <Typography variant="body2" fontWeight="medium">
+                        {params.value}
+                      </Typography>
+                    )
+                  },
+                  { 
+                    field: 'department', 
+                    headerName: 'Department',
+                    renderCell: (params) => (
+                      <Typography variant="body2">
+                        {params.value}
+                      </Typography>
+                    )
+                  },
+                  { 
+                    field: 'checkInTime', 
+                    headerName: 'Check-in Time',
+                    renderCell: (params) => (
+                      <Typography variant="body2" color="text.secondary">
+                        {new Date(params.value).toLocaleTimeString()}
+                      </Typography>
+                    )
+                  },
+                  { 
+                    field: 'status', 
+                    headerName: 'Status',
+                    renderCell: (params) => (
+                      <Chip 
+                        label={params.value} 
+                        size="small" 
+                        color={params.value === 'Completed' ? 'success' : 'warning'}
+                      />
+                    )
+                  }
+                ]}
+                rowActions={[
+                  { label: 'View Details', icon: <AddIcon />, onClick: ({ row }) => console.log('View Details', row) }
+                ]}
+                searchable
+                pagination
+              />
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
       {/* Add Employee Modal */}
       <Dialog open={showAddEmployee} onClose={() => setShowAddEmployee(false)} maxWidth="sm" fullWidth>
