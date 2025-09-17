@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs, Tab, Box, Paper } from '@mui/material';
+import { Box } from '@mui/material';
 import SidebarLayout from '../../components/layout/SidebarLayout';
 import DevOverviewTab from '../../components/developer/tabs/DevOverviewTab';
 import CompaniesDevTab from '../../components/developer/tabs/CompaniesDevTab';
@@ -45,33 +45,7 @@ export default function DeveloperDashboard() {
   const navItems = tabList.map((item, idx) => ({ label: item.label, icon: item.icon, selected: tab === idx, onClick: () => setTab(idx) }));
   return (
     <SidebarLayout navItems={navItems} title="Developer">
-      <Paper 
-        elevation={1} 
-        sx={{ 
-          p: { xs: 0.5, sm: 1 }, 
-          borderRadius: { xs: 2, sm: 3 },
-          overflow: 'hidden',
-          width: '100%',
-          maxWidth: '100%'
-        }}
-      >
-        <Tabs 
-          value={tab} 
-          onChange={(_, v) => setTab(v)} 
-          variant="scrollable" 
-          scrollButtons="auto" 
-          textColor="primary" 
-          indicatorColor="primary"
-          sx={{
-            '& .MuiTabs-scrollButtons': {
-              '&.Mui-disabled': { opacity: 0.3 }
-            }
-          }}
-        >
-          {tabList.map((item) => <Tab key={item.label} label={item.label} />)}
-        </Tabs>
-      </Paper>
-      <Box mt={{ xs: 1, sm: 2 }} className="fade-in" sx={{ overflow: 'hidden', width: '100%' }}>
+      <Box className="fade-in" sx={{ overflow: 'hidden', width: '100%' }}>
         {tabComponents[tab]}
       </Box>
     </SidebarLayout>

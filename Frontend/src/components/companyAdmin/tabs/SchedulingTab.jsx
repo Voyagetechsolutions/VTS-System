@@ -4,11 +4,12 @@ import DataTable from '../../common/DataTable';
 import { listTripSchedules, upsertTripSchedule, getAllRoutesGlobal } from '../../../supabase/api';
 import { Box } from '@mui/material';
 import { ModernButton, ModernSelect, ModernTextField } from '../../common/FormComponents';
+import { FormGroup, FormControlLabel, Checkbox } from '@mui/material';
 
 export default function SchedulingTab() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ id: null, route_id: '', departure_time: '', arrival_time: '', frequency: 'Daily' });
+  const [form, setForm] = useState({ id: null, route_id: '', departure_time: '', arrival_time: '', frequency: 'Daily', days: { Mon: false, Tue: false, Wed: false, Thu: false, Fri: false, Sat: false, Sun: false } });
   const [routes, setRoutes] = useState([]);
 
   const load = async () => {
@@ -22,7 +23,7 @@ export default function SchedulingTab() {
 
   const save = async () => {
     await upsertTripSchedule(form);
-    setForm({ id: null, route_id: '', departure_time: '', arrival_time: '', frequency: 'Daily' });
+    setForm({ id: null, route_id: '', departure_time: '', arrival_time: '', frequency: 'Daily', days: { Mon: false, Tue: false, Wed: false, Thu: false, Fri: false, Sat: false, Sun: false } });
     load();
   };
 
@@ -33,6 +34,13 @@ export default function SchedulingTab() {
         <ModernTextField label="Depart" type="time" value={form.departure_time} onChange={e => setForm(f => ({ ...f, departure_time: e.target.value }))} />
         <ModernTextField label="Arrive" type="time" value={form.arrival_time} onChange={e => setForm(f => ({ ...f, arrival_time: e.target.value }))} />
         <ModernTextField label="Frequency" value={form.frequency} onChange={e => setForm(f => ({ ...f, frequency: e.target.value }))} />
+        {form.frequency?.toLowerCase() === 'custom' && (
+          <FormGroup row>
+            {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (
+              <FormControlLabel key={d} control={<Checkbox checked={!!form.days[d]} onChange={e => setForm(f => ({ ...f, days: { ...f.days, [d]: e.target.checked } }))} />} label={d} />
+            ))}
+          </FormGroup>
+        )}
         <ModernButton variant="contained" icon="save" onClick={save}>Save</ModernButton>
       </Box>
     }>

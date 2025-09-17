@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Table, TableHead, TableRow, TableCell, TableBody, TablePagination, Button, TextField, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, Stack, Divider } from '@mui/material';
+import { Table, TableHead, TableRow, TableCell, TableBody, TablePagination, Button, TextField, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, Stack, Divider, Grid, Paper, Typography } from '@mui/material';
+import BarChart from '../charts/BarChart';
+import { supabase } from '../../../supabase/client';
 import { getCompanyBookings, createBooking, updateBooking, deleteBooking, getCompanyRoutes, getCompanyBuses } from '../../../supabase/api';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 
 export default function BookingsTab() {
   const [bookings, setBookings] = useState([]);
+  const [branchChart, setBranchChart] = useState([]);
+  const [channelChart, setChannelChart] = useState([]);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -18,9 +22,21 @@ export default function BookingsTab() {
   const [form, setForm] = useState({ passenger_name: '', seat_number: 1, booking_date: new Date().toISOString(), payment_status: 'unpaid', booking_source: 'app' });
 
   useEffect(() => {
-    getCompanyBookings().then(({ data }) => setBookings(data || []));
-    getCompanyRoutes().then(({ data }) => setRouteOptions(data || []));
-    getCompanyBuses().then(({ data }) => setBusOptions(data || []));
+    (async () => {
+      getCompanyBookings().then(({ data }) => setBookings(data || []));
+      getCompanyRoutes().then(({ data }) => setRouteOptions(data || []));
+      getCompanyBuses().then(({ data }) => setBusOptions(data || []));
+      try {
+        const cid = window.companyId;
+        const { data: byBranch } = await supabase.rpc('bookings_by_branch', { p_company_id: cid });
+        setBranchChart((byBranch || []).map(r => ({ label: r.branch_name || String(r.branch_id||'Unknown'), value: Number(r.count||0) })));
+      } catch {}
+      try {
+        const cid = window.companyId;
+        const { data: byChannel } = await supabase.rpc('bookings_by_channel', { p_company_id: cid });
+        setChannelChart((byChannel || []).map(r => ({ label: String(r.channel||'Unknown'), value: Number(r.count||0) })));
+      } catch {}
+    })();
   }, []);
 
   const filtered = bookings.filter(b => b.passenger_name.toLowerCase().includes(search.toLowerCase()));
@@ -111,6 +127,20 @@ export default function BookingsTab() {
 
   return (
     <>
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6">Bookings by Branch</Typography>
+            <BarChart data={branchChart} />
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6">Bookings by Channel</Typography>
+            <BarChart data={channelChart} />
+          </Paper>
+        </Grid>
+      </Grid>
       <TextField label="Search Bookings" value={search} onChange={e => setSearch(e.target.value)} sx={{ mb: 2 }} />
       <Button variant="contained" color="primary" sx={{ mb: 2 }} onClick={openNew}>Add Booking</Button>
       <Table>
@@ -131,7 +161,7 @@ export default function BookingsTab() {
               <TableCell>
                 <Button size="small" variant="outlined" onClick={() => openActions(b)}>Actions</Button>
                 <IconButton onClick={() => openEdit(b)}><EditIcon /></IconButton>
-                <IconButton onClick={async () => { await deleteBooking(b.booking_id); getCompanyBookings().then(({ data }) => setBookings(data || [])); }}><DeleteIcon /></IconButton>
+                <IconButton onClick={async () => { await deleteBooking(b.booking_id); try { await supabase.from('activity_log').insert([{ company_id: window.companyId, type: 'booking_delete', message: JSON.stringify({ booking_id: b.booking_id, by: window.userId }) }]); } catch {} getCompanyBookings().then(({ data }) => setBookings(data || [])); }}><DeleteIcon /></IconButton>
               </TableCell>
             </TableRow>
           ))}

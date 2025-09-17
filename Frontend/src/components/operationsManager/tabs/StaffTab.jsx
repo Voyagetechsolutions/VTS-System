@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Table, TableHead, TableRow, TableCell, TableBody, TablePagination, TextField, Button, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem } from '@mui/material';
+import { Table, TableHead, TableRow, TableCell, TableBody, TablePagination, TextField, Button, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, Stack, Typography } from '@mui/material';
+import { supabase } from '../../../supabase/client';
 import { getDrivers, createDriver, updateDriver, assignDriver, suspendDriver, getCompanyRoutes, getCompanyBuses } from '../../../supabase/api';
 
 export default function StaffTab() {
@@ -12,6 +13,8 @@ export default function StaffTab() {
   const [form, setForm] = useState({ name: '', license_number: '', status: 'available', assigned_route_id: '', assigned_bus_id: '' });
   const [routes, setRoutes] = useState([]);
   const [buses, setBuses] = useState([]);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [view, setView] = useState(null);
 
   const load = async () => {
     const [{ data: d }, { data: r }, { data: b }] = await Promise.all([
@@ -67,6 +70,7 @@ export default function StaffTab() {
               <TableCell>{buses.find(b => b.bus_id === s.assigned_bus_id)?.license_plate || '-'}</TableCell>
               <TableCell>
                 <Button size="small" onClick={() => openEdit(s)}>Edit</Button>
+                <Button size="small" onClick={async () => { try { const { data } = await supabase.from('users').select('*').eq('user_id', s.driver_id).maybeSingle(); setView(data||s); setViewOpen(true); } catch { setView(s); setViewOpen(true); } }}>View</Button>
                 <Button size="small" color="warning" onClick={async () => { await suspendDriver(s.driver_id); load(); }}>Suspend</Button>
               </TableCell>
             </TableRow>
@@ -105,6 +109,23 @@ export default function StaffTab() {
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={save}>Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={viewOpen} onClose={() => setViewOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Employee Details</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1} sx={{ mt: 1 }}>
+            <Typography variant="body2">Name: {view?.name || '-'}</Typography>
+            <Typography variant="body2">Email: {view?.email || '-'}</Typography>
+            <Typography variant="body2">Role: {view?.role || 'driver'}</Typography>
+            <Typography variant="body2">Phone: {view?.phone || '-'}</Typography>
+            <Typography variant="body2">License: {view?.license_number || '-'}</Typography>
+            <Typography variant="body2">Status: {view?.status || '-'}</Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </>

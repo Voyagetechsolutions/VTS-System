@@ -99,18 +99,7 @@ try {
 }
 
 // Optional: quick test button for Sentry errors (dev only)
-function ErrorButton() {
-  return (
-    <button
-      onClick={() => {
-        throw new Error('This is your first error!');
-      }}
-      style={{ position: 'fixed', left: 12, bottom: 12, zIndex: 9999 }}
-    >
-      Break the world
-    </button>
-  );
-}
+function ErrorButton() { return null; }
 
 // iOS-safe LogRocket initialization
 (async () => {
@@ -156,8 +145,7 @@ try {
         React.createElement(window.Sentry.ErrorBoundary, {
           fallback: React.createElement('div', null, 'Something went wrong.')
         },
-          React.createElement(App),
-          process.env.NODE_ENV !== 'production' ? React.createElement(ErrorButton) : null
+          React.createElement(App)
         )
       )
     );
@@ -168,8 +156,7 @@ try {
     root.render(
       React.createElement(React.StrictMode, null,
         React.createElement(ErrorBoundary, null,
-          React.createElement(App),
-          process.env.NODE_ENV !== 'production' ? React.createElement(ErrorButton) : null
+          React.createElement(App)
         )
       )
     );

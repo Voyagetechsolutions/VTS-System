@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, TextField, Button } from '@mui/material';
+import { Box, TextField, Button, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, Stack } from '@mui/material';
 import DashboardCard from '../../common/DashboardCard';
 import DataTable from '../../common/DataTable';
 import { supabase } from '../../../supabase/client';
@@ -10,6 +10,10 @@ export default function TasksWorkflowTab() {
   const [type, setType] = useState('');
   const [assignee, setAssignee] = useState('');
   const companyId = window.companyId || localStorage.getItem('companyId');
+  const [addOpen, setAddOpen] = useState(false);
+  const [form, setForm] = useState({ title: '', type: '', priority: 'medium', bus_id: '', staff_id: '' });
+  const [buses, setBuses] = useState([]);
+  const [staff, setStaff] = useState([]);
 
   const load = async () => {
     let q = supabase.from('maintenance_tasks').select('id, bus_id, title, type, status, priority, staff_id').eq('company_id', companyId);
@@ -18,6 +22,11 @@ export default function TasksWorkflowTab() {
   };
   useEffect(() => { load(); }, [companyId]);
 
+  useEffect(() => { (async ()=>{ try { const [{ data: bs }, { data: st }] = await Promise.all([
+    supabase.from('buses').select('bus_id, license_plate').eq('company_id', companyId),
+    supabase.from('users').select('user_id, name, role').eq('company_id', companyId),
+  ]); setBuses(bs||[]); setStaff(st||[]); } catch {} })(); }, [companyId]);
+
   const startTask = async (row) => { await supabase.from('maintenance_tasks').update({ status: 'in_progress' }).eq('id', row.id); load(); };
   const completeTask = async (row) => {
     const hours = Number(prompt('Labor hours?') || 0);
@@ -25,7 +34,6 @@ export default function TasksWorkflowTab() {
     const parts = Number(prompt('Parts cost?') || 0);
     const total = (hours * rate) + parts;
     await supabase.from('maintenance_tasks').update({ status: 'completed', labor_hours: hours, labor_rate: rate, parts_cost: parts, total_cost: total }).eq('id', row.id);
-    // mirror to Finance expenses
     try { await supabase.from('expenses').insert({ company_id: companyId, category: 'maintenance', bus_id: row.bus_id, amount: total }); } catch {}
     load();
   };
@@ -34,6 +42,13 @@ export default function TasksWorkflowTab() {
     const vendor = prompt('Vendor ID (optional)');
     const notes = prompt('Notes for outsourcing');
     await supabase.from('maintenance_tasks').update({ outsourced: true, vendor_id: vendor || null, outsourced_notes: notes || null, status: 'outsourced' }).eq('id', row.id);
+    load();
+  };
+
+  const addTask = async () => {
+    if (!form.title || !form.bus_id || !form.staff_id) return;
+    await supabase.from('maintenance_tasks').insert([{ company_id: companyId, title: form.title, type: form.type || null, priority: form.priority, bus_id: form.bus_id, staff_id: form.staff_id, status: 'open' }]);
+    setAddOpen(false); setForm({ title: '', type: '', priority: 'medium', bus_id: '', staff_id: '' });
     load();
   };
 
@@ -50,6 +65,7 @@ export default function TasksWorkflowTab() {
           <TextField size="small" label="Bus" value={bus} onChange={e => setBus(e.target.value)} />
           <TextField size="small" label="Type" value={type} onChange={e => setType(e.target.value)} />
           <TextField size="small" label="Assignee" value={assignee} onChange={e => setAssignee(e.target.value)} />
+          <Button size="small" variant="contained" onClick={()=>setAddOpen(true)}>Add Task</Button>
         </Box>
       }>
         <DataTable
@@ -60,6 +76,33 @@ export default function TasksWorkflowTab() {
           pagination
         />
       </DashboardCard>
+
+      <Dialog open={addOpen} onClose={()=>setAddOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Create Maintenance Task</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField label="Title" value={form.title} onChange={e=>setForm(f=>({...f, title: e.target.value}))} fullWidth />
+            <TextField label="Type" value={form.type} onChange={e=>setForm(f=>({...f, type: e.target.value}))} fullWidth />
+            <Select displayEmpty value={form.priority} onChange={e=>setForm(f=>({...f, priority: e.target.value}))}>
+              <MenuItem value="low">Low</MenuItem>
+              <MenuItem value="medium">Medium</MenuItem>
+              <MenuItem value="high">High</MenuItem>
+            </Select>
+            <Select displayEmpty value={form.bus_id} onChange={e=>setForm(f=>({...f, bus_id: e.target.value}))}>
+              <MenuItem value="">Select Bus...</MenuItem>
+              {(buses||[]).map(b => <MenuItem key={b.bus_id} value={b.bus_id}>{b.license_plate}</MenuItem>)}
+            </Select>
+            <Select displayEmpty value={form.staff_id} onChange={e=>setForm(f=>({...f, staff_id: e.target.value}))}>
+              <MenuItem value="">Assign Staff...</MenuItem>
+              {(staff||[]).map(s => <MenuItem key={s.user_id} value={s.user_id}>{s.name} • {s.role}</MenuItem>)}
+            </Select>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={()=>setAddOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={addTask}>Save</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

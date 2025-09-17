@@ -4,6 +4,10 @@ import { supabase } from '../../supabase/client';
 
 export default function ProfileSettingsTab() {
   const [name, setName] = useState(window.user?.name || '');
+  const [contact, setContact] = useState(window.user?.email || '');
+  const [phone, setPhone] = useState('');
+  const [role] = useState(window.userRole || '');
+  const [company] = useState(window.companyName || '');
   const [password, setPassword] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -16,9 +20,7 @@ export default function ProfileSettingsTab() {
   const save = async () => {
     setSaving(true); setMsg('');
     try {
-      if (name) {
-        await window.supabase.from('users').update({ name }).eq('user_id', window.userId);
-      }
+      await window.supabase.from('users').update({ name, phone, contact }).eq('user_id', window.userId);
       if (password) {
         await supabase.auth.updateUser({ password });
       }
@@ -55,8 +57,15 @@ export default function ProfileSettingsTab() {
     <Box>
       <Typography variant="h6" sx={{ mb: 2 }}>Profile & Settings</Typography>
       <Paper sx={{ p: 2 }}>
-        <Stack spacing={2} maxWidth={420}>
+        <Stack spacing={2} maxWidth={560}>
+          <Typography variant="subtitle1">Personal Information</Typography>
           <TextField label="Name" value={name} onChange={e => setName(e.target.value)} />
+          <TextField label="Email" value={contact} onChange={e => setContact(e.target.value)} />
+          <TextField label="Phone" value={phone} onChange={e => setPhone(e.target.value)} />
+          <TextField label="Role" value={role} disabled />
+          <TextField label="Company" value={company} disabled />
+          <Divider />
+          <Typography variant="subtitle1">Account Settings</Typography>
           <TextField label="New Password" type="password" value={password} onChange={e => setPassword(e.target.value)} />
           <Stack direction="row" spacing={2}>
             <Button variant="contained" disabled={saving} onClick={save}>Save</Button>

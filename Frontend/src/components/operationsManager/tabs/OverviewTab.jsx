@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Grid, Typography, Button, Box, Stack } from '@mui/material';
+import { Grid, Typography, Button, Box, Stack, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, TextField, Checkbox, FormControlLabel } from '@mui/material';
 import AltRouteIcon from '@mui/icons-material/AltRoute';
 import DirectionsBusFilledIcon from '@mui/icons-material/DirectionsBusFilled';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
@@ -7,7 +7,7 @@ import PercentIcon from '@mui/icons-material/Percent';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { formatNumber } from '../../../utils/formatters';
 import BarChart from '../../charts/BarChart';
-import { getOpsManagerKPIs, assignBusToRoute, updateTripStatus, upsertTripSchedule, getCompanyAlertsFeed } from '../../../supabase/api';
+import { getOpsManagerKPIs, assignBusToRoute, updateTripStatus, upsertTripSchedule, getCompanyAlertsFeed, getCompanyRoutes, getCompanyBuses, getDrivers } from '../../../supabase/api';
 import { subscribeToBookings, subscribeToBuses, subscribeToIncidents, subscribeToTrips } from '../../../supabase/realtime';
 import { supabase } from '../../../supabase/client';
 import CommandCenterMap from '../../companyAdmin/tabs/CommandCenterMap';
@@ -20,7 +20,13 @@ export default function OverviewTab() {
   const [kpis, setKpis] = useState({});
   const [alerts, setAlerts] = useState([]);
   const [timelineTrips, setTimelineTrips] = useState([]);
-  const [suggestions, setSuggestions] = useState([]);
+  const [buses, setBuses] = useState([]);
+  const [routes, setRoutes] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [dialogs, setDialogs] = useState({ reassign: false, reroute: false, delay: false, cancel: false });
+  const [forms, setForms] = useState({ reassign: { trip_id: '', bus_id: '', route_id: '', current_driver_id: '', replace_driver_id: '', new_driver_id: '' }, reroute: { bus_id: '', route_id: '' }, delay: { trip_id: '', minutes: 10, inform: true }, cancel: { trip_id: '', inform: true } });
+  const [busMap, setBusMap] = useState({});
+  const [driverMap, setDriverMap] = useState({});
   const [fatigue, setFatigue] = useState([]);
 
   const loadKPIsAndAlerts = async () => {
@@ -42,32 +48,18 @@ export default function OverviewTab() {
       .gte('departure_time', start.toISOString())
       .lte('departure_time', end.toISOString())
       .order('departure_time', { ascending: true });
-    setTimelineTrips(data || []);
+    const base = data || [];
+    try {
+      const [{ data: bs }, { data: ds }, { data: rs }] = await Promise.all([ getCompanyBuses(), supabase.from('users').select('user_id,name').eq('role','driver'), getCompanyRoutes() ]);
+      const busLookup = Object.fromEntries((bs||[]).map(b => [b.bus_id, b.license_plate]));
+      const driverLookup = Object.fromEntries((ds||[]).map(d => [d.user_id, d.name]));
+      setBusMap(busLookup); setDriverMap(driverLookup);
+      setBuses(bs||[]); setRoutes(rs||[]); setDrivers(ds||[]);
+    } catch {}
+    setTimelineTrips(base);
   };
 
-  const computeSuggestions = () => {
-    const s = [];
-    try {
-      const byRoute = {};
-      (timelineTrips || []).forEach(t => {
-        const key = t.route_name || 'Route';
-        byRoute[key] = byRoute[key] || { count: 0, loads: [] };
-        byRoute[key].count += 1;
-        if (t.capacity && t.passenger_count != null) {
-          byRoute[key].loads.push((t.passenger_count / Math.max(1, t.capacity)) * 100);
-        }
-      });
-      Object.entries(byRoute).forEach(([route, info]) => {
-        const avgLoad = info.loads.length ? (info.loads.reduce((a,b)=>a+b,0) / info.loads.length) : 0;
-        if (avgLoad >= 85) {
-          s.push(`Route ${route} is averaging ${Math.round(avgLoad)}% load. Consider adding a bus.`);
-        }
-      });
-      if ((kpis.delaysToday || 0) > 5) s.push('High delays today. Consider rerouting or adjusting headways.');
-      if ((kpis.incidentsToday || 0) > 0) s.push('Incidents detected. Ensure spare buses and relief drivers are available.');
-    } catch {}
-    setSuggestions(s);
-  };
+  // Removed AI suggestions per spec
 
   const computeFatigue = async () => {
     // Heuristic: if a driver has more than 10 hours driving in last 24h or <8h rest between trips, flag
@@ -103,7 +95,7 @@ export default function OverviewTab() {
     setFatigue(issues);
   };
 
-  useEffect(() => { computeSuggestions(); }, [timelineTrips, kpis]);
+  // AI suggestions removed
 
   useEffect(() => {
     loadKPIsAndAlerts();
@@ -120,36 +112,34 @@ export default function OverviewTab() {
     };
   }, []);
 
-  const quickAssignDriver = async () => {
-    const tripId = prompt('Trip ID to reassign driver');
-    const driverId = prompt('New Driver ID');
-    if (!tripId || !driverId) return;
-    await upsertTripSchedule(tripId, { driver_id: driverId });
+  const openDialog = (key) => setDialogs(d => ({ ...d, [key]: true }));
+  const closeDialog = (key) => setDialogs(d => ({ ...d, [key]: false }));
+  const submitReassign = async () => {
+    const f = forms.reassign;
+    if (!f.trip_id || !f.new_driver_id) return;
+    await upsertTripSchedule(f.trip_id, { driver_id: f.new_driver_id });
+    setDialogs(d => ({ ...d, reassign: false }));
     await loadTodayTrips();
-    alert('Driver reassigned');
   };
-  const quickRerouteBus = async () => {
-    const busId = prompt('Bus ID');
-    const routeId = prompt('New Route ID');
-    if (!busId || !routeId) return;
-    await assignBusToRoute(busId, routeId);
+  const submitReroute = async () => {
+    const f = forms.reroute; if (!f.bus_id || !f.route_id) return;
+    await assignBusToRoute(f.bus_id, f.route_id);
+    setDialogs(d => ({ ...d, reroute: false }));
     await loadKPIsAndAlerts();
-    alert('Bus rerouted');
   };
-  const quickDelayTrip = async () => {
-    const tripId = prompt('Trip ID to delay');
-    const minutes = Number(prompt('Delay minutes', '10')) || 0;
-    if (!tripId || !minutes) return;
-    await updateTripStatus(tripId, 'Delayed');
+  const submitDelay = async () => {
+    const f = forms.delay; if (!f.trip_id) return;
+    await updateTripStatus(f.trip_id, 'Delayed');
+    if (f.inform) { try { await supabase.from('announcements').insert([{ company_id: window.companyId, title: 'Trip Delayed', message: `Trip ${f.trip_id} delayed by ${f.minutes} minutes.` }]); } catch {} }
+    setDialogs(d => ({ ...d, delay: false }));
     await loadTodayTrips();
-    alert('Trip marked delayed');
   };
-  const quickCancelTrip = async () => {
-    const tripId = prompt('Trip ID to cancel');
-    if (!tripId) return;
-    await updateTripStatus(tripId, 'Cancelled');
+  const submitCancel = async () => {
+    const f = forms.cancel; if (!f.trip_id) return;
+    await updateTripStatus(f.trip_id, 'Cancelled');
+    if (f.inform) { try { await supabase.from('announcements').insert([{ company_id: window.companyId, title: 'Trip Cancelled', message: `Trip ${f.trip_id} has been cancelled.` }]); } catch {} }
+    setDialogs(d => ({ ...d, cancel: false }));
     await loadTodayTrips();
-    alert('Trip cancelled');
   };
 
   const renderTimeline = () => (
@@ -178,14 +168,15 @@ export default function OverviewTab() {
   );
 
   const quickActions = [
-    { label: 'Reassign Driver', icon: 'driver', onClick: quickAssignDriver },
-    { label: 'Reroute Bus', icon: 'routes', onClick: quickRerouteBus },
-    { label: 'Delay Trip', icon: 'schedule', onClick: quickDelayTrip },
-    { label: 'Cancel Trip', icon: 'close', onClick: quickCancelTrip },
+    { label: 'Reassign Driver', icon: 'driver', onClick: () => openDialog('reassign') },
+    { label: 'Reroute Bus', icon: 'routes', onClick: () => openDialog('reroute') },
+    { label: 'Delay Trip', icon: 'schedule', onClick: () => openDialog('delay') },
+    { label: 'Cancel Trip', icon: 'close', onClick: () => openDialog('cancel') },
   ];
 
   return (
-    <Box>
+    <>
+      <Box>
       <Grid container spacing={2}>
         <Grid item xs={12}>
           <DashboardCard title="Live Map" variant="elevated">
@@ -205,39 +196,37 @@ export default function OverviewTab() {
         <Grid item xs={12} md={4}>
           <QuickActionCard title="Quick Actions" actions={quickActions} />
         </Grid>
-        <Grid item xs={12} md={8}>
-          <DashboardCard title="Alerts & Activity" variant="outlined">
-            <DataTable
-              data={alerts}
-              columns={[
-                { field: 'created_at', headerName: 'Time', type: 'date' },
-                { field: 'type', headerName: 'Type' },
-                { field: 'message', headerName: 'Message' },
-              ]}
-              searchable
-              pagination
-            />
-          </DashboardCard>
-        </Grid>
+        {/* Removed Alerts & Activity per spec */}
       </Grid>
 
-      <Box mt={3}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
-          <Button variant="contained" color="primary" onClick={quickAssignDriver}>Reassign Driver</Button>
-          <Button variant="contained" color="primary" onClick={quickRerouteBus}>Reroute Bus</Button>
-          <Button variant="contained" color="warning" onClick={quickDelayTrip}>Delay Trip</Button>
-          <Button variant="contained" color="error" onClick={quickCancelTrip}>Cancel Trip</Button>
-        </Stack>
-      </Box>
-
-      <Box mt={4}>{renderTimeline()}</Box>
+      {/* Removed extra buttons under quick actions per spec */}
 
       <Box mt={4}>
-        <DashboardCard title="AI Suggestions" variant="outlined">
-          {(suggestions || []).map((s, idx) => <Typography key={idx}>• {s}</Typography>)}
-          {(!suggestions || suggestions.length === 0) && <Typography variant="body2">No suggestions at the moment</Typography>}
+        <DashboardCard title="Today's Trips" variant="outlined">
+          <DataTable
+            data={(timelineTrips||[]).map(t => ({
+              trip_id: t.trip_id,
+              route: t.route_name,
+              bus: busMap[t.bus_id] || t.bus_id || '-',
+              driver: driverMap[t.driver_id] || t.driver_id || '-',
+              seats_booked: t.passenger_count || 0,
+              departure: t.departure_time,
+            }))}
+            columns={[
+              { field: 'trip_id', headerName: 'Trip' },
+              { field: 'route', headerName: 'Route' },
+              { field: 'bus', headerName: 'Bus' },
+              { field: 'driver', headerName: 'Driver(s)' },
+              { field: 'seats_booked', headerName: 'Seats Booked' },
+              { field: 'departure', headerName: 'Departure', type: 'date' },
+            ]}
+            searchable
+            pagination
+          />
         </DashboardCard>
       </Box>
+
+      {/* AI suggestions removed per spec */}
 
       <Box mt={4}>
         <DashboardCard title="Fatigue Alerts" variant="outlined">
@@ -255,14 +244,18 @@ export default function OverviewTab() {
       </Box>
 
       <Box mt={4}>
-        <DashboardCard title="Occupancy Trends" variant="outlined">
-          <BarChart data={kpis.occupancyTrends || []} xKey="month" yKey="occupancy" />
-        </DashboardCard>
-      </Box>
-      <Box mt={4}>
-        <DashboardCard title="Booking Trends" variant="outlined">
-          <BarChart data={kpis.bookingTrends || []} xKey="month" yKey="bookings" />
-        </DashboardCard>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={6}>
+            <DashboardCard title="Occupancy Trends" variant="outlined">
+              <BarChart data={kpis.occupancyTrends || []} xKey="month" yKey="occupancy" />
+            </DashboardCard>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <DashboardCard title="Booking Trends" variant="outlined">
+              <BarChart data={kpis.bookingTrends || []} xKey="month" yKey="bookings" />
+            </DashboardCard>
+          </Grid>
+        </Grid>
       </Box>
       <Box mt={4}>
         <DashboardCard title="Route Performance" variant="outlined">
@@ -270,5 +263,94 @@ export default function OverviewTab() {
         </DashboardCard>
       </Box>
     </Box>
+
+      {/* Dialogs */}
+    <Dialog open={dialogs.reassign} onClose={() => closeDialog('reassign')} maxWidth="sm" fullWidth>
+      <DialogTitle>Reassign Driver</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <Select displayEmpty value={forms.reassign.trip_id} onChange={e => setForms(f => ({ ...f, reassign: { ...f.reassign, trip_id: e.target.value } }))}>
+            <MenuItem value="">Select Trip...</MenuItem>
+            {(timelineTrips||[]).map(t => <MenuItem key={t.trip_id} value={t.trip_id}>{t.trip_id} · {t.route_name}</MenuItem>)}
+          </Select>
+          <Select displayEmpty value={forms.reassign.bus_id} onChange={e => setForms(f => ({ ...f, reassign: { ...f.reassign, bus_id: e.target.value } }))}>
+            <MenuItem value="">Select Bus...</MenuItem>
+            {(buses||[]).map(b => <MenuItem key={b.bus_id} value={b.bus_id}>{b.license_plate}</MenuItem>)}
+          </Select>
+          <Select displayEmpty value={forms.reassign.route_id} onChange={e => setForms(f => ({ ...f, reassign: { ...f.reassign, route_id: e.target.value } }))}>
+            <MenuItem value="">Select Route...</MenuItem>
+            {(routes||[]).map(r => <MenuItem key={r.route_id} value={r.route_id}>{r.origin} → {r.destination}</MenuItem>)}
+          </Select>
+          <Select displayEmpty value={forms.reassign.replace_driver_id} onChange={e => setForms(f => ({ ...f, reassign: { ...f.reassign, replace_driver_id: e.target.value } }))}>
+            <MenuItem value="">Pick driver to replace...</MenuItem>
+            {(drivers||[]).map(d => <MenuItem key={d.user_id} value={d.user_id}>{d.name}</MenuItem>)}
+          </Select>
+          <Select displayEmpty value={forms.reassign.new_driver_id} onChange={e => setForms(f => ({ ...f, reassign: { ...f.reassign, new_driver_id: e.target.value } }))}>
+            <MenuItem value="">New driver...</MenuItem>
+            {(drivers||[]).map(d => <MenuItem key={d.user_id} value={d.user_id}>{d.name}</MenuItem>)}
+          </Select>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => closeDialog('reassign')}>Cancel</Button>
+        <Button variant="contained" onClick={submitReassign}>Save</Button>
+      </DialogActions>
+    </Dialog>
+
+    <Dialog open={dialogs.reroute} onClose={() => closeDialog('reroute')} maxWidth="sm" fullWidth>
+      <DialogTitle>Reroute Bus</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <Select displayEmpty value={forms.reroute.bus_id} onChange={e => setForms(f => ({ ...f, reroute: { ...f.reroute, bus_id: e.target.value } }))}>
+            <MenuItem value="">Select Bus...</MenuItem>
+            {(buses||[]).map(b => <MenuItem key={b.bus_id} value={b.bus_id}>{b.license_plate}</MenuItem>)}
+          </Select>
+          <Select displayEmpty value={forms.reroute.route_id} onChange={e => setForms(f => ({ ...f, reroute: { ...f.reroute, route_id: e.target.value } }))}>
+            <MenuItem value="">Select Route...</MenuItem>
+            {(routes||[]).map(r => <MenuItem key={r.route_id} value={r.route_id}>{r.origin} → {r.destination}</MenuItem>)}
+          </Select>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => closeDialog('reroute')}>Cancel</Button>
+        <Button variant="contained" onClick={submitReroute}>Save</Button>
+      </DialogActions>
+    </Dialog>
+
+    <Dialog open={dialogs.delay} onClose={() => closeDialog('delay')} maxWidth="sm" fullWidth>
+      <DialogTitle>Delay Trip</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <Select displayEmpty value={forms.delay.trip_id} onChange={e => setForms(f => ({ ...f, delay: { ...f.delay, trip_id: e.target.value } }))}>
+            <MenuItem value="">Select Trip...</MenuItem>
+            {(timelineTrips||[]).map(t => <MenuItem key={t.trip_id} value={t.trip_id}>{t.trip_id} · {t.route_name}</MenuItem>)}
+          </Select>
+          <TextField type="number" label="Minutes" value={forms.delay.minutes} onChange={e => setForms(f => ({ ...f, delay: { ...f.delay, minutes: Number(e.target.value||0) } }))} />
+          <FormControlLabel control={<Checkbox checked={!!forms.delay.inform} onChange={e => setForms(f => ({ ...f, delay: { ...f.delay, inform: e.target.checked } }))} />} label="Inform passengers" />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => closeDialog('delay')}>Cancel</Button>
+        <Button variant="contained" onClick={submitDelay}>Save</Button>
+      </DialogActions>
+    </Dialog>
+
+    <Dialog open={dialogs.cancel} onClose={() => closeDialog('cancel')} maxWidth="sm" fullWidth>
+      <DialogTitle>Cancel Trip</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <Select displayEmpty value={forms.cancel.trip_id} onChange={e => setForms(f => ({ ...f, cancel: { ...f.cancel, trip_id: e.target.value } }))}>
+            <MenuItem value="">Select Trip...</MenuItem>
+            {(timelineTrips||[]).map(t => <MenuItem key={t.trip_id} value={t.trip_id}>{t.trip_id} · {t.route_name}</MenuItem>)}
+          </Select>
+          <FormControlLabel control={<Checkbox checked={!!forms.cancel.inform} onChange={e => setForms(f => ({ ...f, cancel: { ...f.cancel, inform: e.target.checked } }))} />} label="Inform passengers" />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => closeDialog('cancel')}>Cancel</Button>
+        <Button variant="contained" onClick={submitCancel}>Save</Button>
+      </DialogActions>
+    </Dialog>
+    </>
   );
 }

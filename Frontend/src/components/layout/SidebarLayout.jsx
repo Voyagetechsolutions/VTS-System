@@ -125,7 +125,7 @@ export default function SidebarLayout({ children, title, navItems }) {
   };
 
   const userRole = window.userRole || localStorage.getItem('userRole');
-  const userName = window.user?.name || 'User';
+  const userName = window.user?.name || localStorage.getItem('userName') || 'User';
   const userEmail = window.user?.email || localStorage.getItem('userEmail') || '';
   const companyName = window.companyName || 'VTS Company';
 
@@ -409,18 +409,28 @@ export default function SidebarLayout({ children, title, navItems }) {
             <MenuIcon />
           </IconButton>
           
-          <Typography 
-            variant="h6" 
-            noWrap 
-            component="div" 
-            sx={{ 
-              flexGrow: 1,
-              fontWeight: theme.typography.fontWeight.semibold,
-              color: theme.colors.text.primary,
-            }}
-          >
-            {title}
-          </Typography>
+          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+            <Typography 
+              variant="h6" 
+              noWrap 
+              component="div" 
+              sx={{ 
+                fontWeight: theme.typography.fontWeight.semibold,
+                color: theme.colors.text.primary,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {`Welcome back, ${userName}`}
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{ color: theme.colors.text.secondary }}
+            >
+              {title}
+            </Typography>
+          </Box>
           
           {/* Branch Selector for Booking Office */}
           {userRole === 'booking_officer' && branches.length > 0 && (
@@ -462,6 +472,16 @@ export default function SidebarLayout({ children, title, navItems }) {
               '&:hover': {
                 backgroundColor: alpha(theme.colors.primary[500], 0.1),
               },
+            }}
+            onClick={() => {
+              // Try to find a nav item labeled Notifications and click it
+              const notifIndex = (navItems || []).findIndex(i => String(i.label).toLowerCase().includes('notification'));
+              if (notifIndex >= 0 && navItems[notifIndex]?.onClick) {
+                navItems[notifIndex].onClick();
+              } else {
+                // Fallback: route by hash/URL if app uses route segments
+                try { window.location.hash = '#/notifications'; } catch {}
+              }
             }}
           >
             <Badge badgeContent={4} color="error">
@@ -507,7 +527,13 @@ export default function SidebarLayout({ children, title, navItems }) {
         }}
       >
         <MenuItem 
-          onClick={handleProfileMenuClose}
+          onClick={() => {
+            handleProfileMenuClose();
+            // Navigate to profile tab if present in nav
+            const profileIdx = (navItems || []).findIndex(i => String(i.label).toLowerCase().includes('profile'));
+            if (profileIdx >= 0 && navItems[profileIdx]?.onClick) navItems[profileIdx].onClick();
+            else try { window.location.hash = '#/profile'; } catch {}
+          }}
           sx={{
             '&:hover': {
               backgroundColor: theme.colors.background.hover,
@@ -518,7 +544,12 @@ export default function SidebarLayout({ children, title, navItems }) {
           Profile
         </MenuItem>
         <MenuItem 
-          onClick={handleProfileMenuClose}
+          onClick={() => {
+            handleProfileMenuClose();
+            const settingsIdx = (navItems || []).findIndex(i => String(i.label).toLowerCase().includes('setting'));
+            if (settingsIdx >= 0 && navItems[settingsIdx]?.onClick) navItems[settingsIdx].onClick();
+            else try { window.location.hash = '#/settings'; } catch {}
+          }}
           sx={{
             '&:hover': {
               backgroundColor: theme.colors.background.hover,

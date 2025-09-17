@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Tabs, Tab, Box, Paper } from '@mui/material';
+import { Box } from '@mui/material';
 import SidebarLayout from '../../components/layout/SidebarLayout';
 import CommandCenterTab from '../../components/companyAdmin/tabs/CommandCenterTab';
 import UsersTab from '../../components/companyAdmin/tabs/UsersTab';
@@ -14,7 +14,7 @@ import FinanceCenterTab from '../../components/companyAdmin/tabs/FinanceCenterTa
 import ReportsTab from '../../components/companyAdmin/tabs/ReportsTab';
 import CustomerTab from '../../components/companyAdmin/tabs/CustomerTab';
 import SettingsTab from '../../components/companyAdmin/tabs/SettingsTab';
-import SupportTab from '../../components/companyAdmin/tabs/SupportTab';
+// Removed SupportTab per spec
 import NotificationsTab from '../../components/tabs/NotificationsTab';
 import ComplianceSafetyTab from '../../components/tabs/ComplianceSafetyTab';
 import DocumentsTab from '../../components/tabs/DocumentsTab';
@@ -26,6 +26,7 @@ import TripInfoTab from '../../components/tabs/TripInfoTab';
 import ApprovalsTab from '../../components/companyAdmin/tabs/ApprovalsTab';
 import GlobalCommunicationsTab from '../../components/companyAdmin/tabs/GlobalCommunicationsTab';
 import OversightMapTab from '../../components/companyAdmin/tabs/OversightMapTab';
+import LiveMapBusesTab from '../../components/companyAdmin/tabs/LiveMapBusesTab';
 // HR modules (reused)
 import HRProfilesTab from '../../components/hr/tabs/ProfilesTab';
 import HRAttendanceTab from '../../components/hr/tabs/AttendanceTab';
@@ -43,6 +44,7 @@ const tabList = [
   { label: 'Approvals & Oversight', icon: 'approval', group: 'Command Center' },
   { label: 'Global Communications', icon: 'announcement', group: 'Command Center' },
   { label: 'Oversight Map', icon: 'analytics', group: 'Command Center' },
+  { label: 'Live Map Buses', icon: 'trips', group: 'Command Center' },
   { label: 'User Management', icon: 'users', group: 'People' },
   { label: 'Driver Hub', icon: 'driver', group: 'People' },
   { label: 'Customer Hub', icon: 'passengers', group: 'People' },
@@ -74,7 +76,7 @@ const tabList = [
   { label: 'Documents', icon: 'documents', group: 'Documents Vault' },
   { label: 'Communications', icon: 'communications', group: 'Communications & Engagement' },
   { label: 'System Settings', icon: 'settings', group: 'Customization & Settings' },
-  { label: 'Support', icon: 'support', group: 'Support & Helpdesk' },
+  // Support removed per spec
   { label: 'Profile', icon: 'profile', group: 'Customization & Settings' }
 ];
 
@@ -83,6 +85,7 @@ const tabComponents = [
   <ApprovalsTab />,     // Approvals & Oversight
   <GlobalCommunicationsTab />, // Global Communications
   <OversightMapTab />,   // Oversight Map
+  <LiveMapBusesTab />,   // Live Map Buses
   <UsersTab />,        // User Management
   <DriverHubTab />,    // Driver Hub
   <CustomerTab />,     // Customer Hub
@@ -103,7 +106,7 @@ const tabComponents = [
   <AdminInventoryTab />, <FinanceCenterTab />,
   // Shared
   <NotificationsTab />, <TripInfoTab scope="admin" />, <ComplianceSafetyTab />, <DocumentsTab />,
-  <CommunicationsTab />, <SettingsTab />, <SupportTab />, <ProfileSettingsTab />
+  <CommunicationsTab />, <SettingsTab />, <ProfileSettingsTab />
 ];
 
 export default function CompanyAdminDashboard() {
@@ -118,31 +121,7 @@ export default function CompanyAdminDashboard() {
   const navItems = tabList.map((item, idx) => ({ label: item.label, icon: item.icon, group: item.group, selected: tab === idx, onClick: () => setTab(idx) }));
   return (
     <SidebarLayout navItems={navItems} title="Company Admin">
-      <Paper 
-        elevation={1} 
-        sx={{ 
-          p: { xs: 0.5, sm: 1 }, 
-          borderRadius: { xs: 2, sm: 3 },
-          overflow: 'hidden',
-          width: '100%',
-          maxWidth: '100%'
-        }}
-      >
-        <Tabs 
-          value={tab} 
-          onChange={(_, v) => setTab(v)} 
-          variant="scrollable" 
-          scrollButtons="auto"
-          sx={{
-            '& .MuiTabs-scrollButtons': {
-              '&.Mui-disabled': { opacity: 0.3 }
-            }
-          }}
-        >
-          {tabList.map((item) => <Tab key={item.label} label={item.label} />)}
-        </Tabs>
-      </Paper>
-      <Box mt={{ xs: 1, sm: 2 }} className="fade-in" sx={{ overflow: 'hidden', width: '100%' }}>
+      <Box className="fade-in" sx={{ overflow: 'hidden', width: '100%' }}>
         {tabComponents[tab]}
       </Box>
     </SidebarLayout>

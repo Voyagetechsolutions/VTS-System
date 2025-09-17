@@ -9,16 +9,25 @@ export default function DispatchTab() {
   const [buses, setBuses] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [trips, setTrips] = useState([]);
+  const [passengers, setPassengers] = useState({});
   const [assign, setAssign] = useState({ trip_id: '', bus_id: '', driver_id: '' });
   const companyId = window.companyId || localStorage.getItem('companyId');
 
   const load = async () => {
     const [{ data: b }, { data: d }, { data: t }] = await Promise.all([
-      supabase.from('buses').select('bus_id, license_plate, status').eq('company_id', companyId),
+      supabase.from('buses').select('bus_id, license_plate, status, current_route, rank').eq('company_id', companyId),
       supabase.from('users').select('user_id, name, role, on_duty').eq('company_id', companyId).eq('role', 'driver').eq('on_duty', true),
       supabase.from('trips_with_details').select('trip_id, route_name, departure_time, status, bus_id, driver_id').eq('company_id', companyId).order('departure_time', { ascending: true }),
     ]);
     setBuses(b||[]); setDrivers(d||[]); setTrips(t||[]);
+    try {
+      const pax = {};
+      for (const trip of (t||[])) {
+        const { data: rows } = await supabase.from('bookings').select('booking_id').eq('trip_id', trip.trip_id).eq('status', 'Confirmed');
+        pax[trip.trip_id] = (rows||[]).length;
+      }
+      setPassengers(pax);
+    } catch {}
   };
   useEffect(() => { load(); }, [companyId]);
 
@@ -58,7 +67,7 @@ export default function DispatchTab() {
         <Grid container spacing={2}>
           <Grid item xs={12} md={4}>
             <DashboardCard title="Buses" variant="outlined">
-              <DataTable data={buses} columns={[{ field: 'bus_id', headerName: 'Bus' }, { field: 'license_plate', headerName: 'Plate' }, { field: 'status', headerName: 'Status' }]} searchable pagination />
+              <DataTable data={buses} columns={[{ field: 'bus_id', headerName: 'Bus' }, { field: 'license_plate', headerName: 'Plate' }, { field: 'status', headerName: 'Status' }, { field: 'current_route', headerName: 'Route' }, { field: 'rank', headerName: 'Rank' }]} searchable pagination />
             </DashboardCard>
           </Grid>
           <Grid item xs={12} md={4}>
@@ -68,7 +77,7 @@ export default function DispatchTab() {
           </Grid>
           <Grid item xs={12} md={4}>
             <DashboardCard title="Trips" variant="outlined">
-              <DataTable data={trips} columns={[{ field: 'trip_id', headerName: 'Trip' }, { field: 'route_name', headerName: 'Route' }, { field: 'departure_time', headerName: 'Departure', type: 'date' }, { field: 'status', headerName: 'Status' }]} searchable pagination />
+              <DataTable data={trips.map(t => ({ ...t, passengers: passengers[t.trip_id] || 0 }))} columns={[{ field: 'trip_id', headerName: 'Trip' }, { field: 'route_name', headerName: 'Route' }, { field: 'departure_time', headerName: 'Departure', type: 'date' }, { field: 'status', headerName: 'Status' }, { field: 'passengers', headerName: 'Passengers' }]} searchable pagination />
             </DashboardCard>
           </Grid>
         </Grid>

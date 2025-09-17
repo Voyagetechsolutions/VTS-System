@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Paper, Typography, Stack, TextField, Button, Divider, List, ListItem, ListItemText } from '@mui/material';
+import { Box, Paper, Typography, Stack, TextField, Button, Divider, List, ListItem, ListItemText, Select, MenuItem } from '@mui/material';
 import { getMessages, sendMessage, getAnnouncements, createAnnouncement } from '../../supabase/api';
 import { subscribeToMessages, subscribeToAnnouncements } from '../../supabase/realtime';
 
@@ -7,6 +7,7 @@ export default function CommunicationsTab() {
   const [messages, setMessages] = useState([]);
   const [ann, setAnn] = useState([]);
   const [text, setText] = useState('');
+  const [target, setTarget] = useState({ type: 'roles', value: 'all' });
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
 
@@ -26,7 +27,7 @@ export default function CommunicationsTab() {
 
   const send = async () => {
     if (!text.trim()) return;
-    await sendMessage(text.trim());
+    await sendMessage(text.trim(), target);
     setText('');
     load();
   };
@@ -45,6 +46,11 @@ export default function CommunicationsTab() {
         <Paper sx={{ p: 2, flex: 1 }}>
           <Typography variant="subtitle1">Messages</Typography>
           <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+            <Select size="small" value={target.type} onChange={e => setTarget(t => ({ ...t, type: e.target.value }))}>
+              <MenuItem value="roles">Roles</MenuItem>
+              <MenuItem value="passenger">Passenger</MenuItem>
+            </Select>
+            <TextField size="small" placeholder={target.type === 'roles' ? 'role (e.g., driver, admin) or all' : 'passenger id/email'} value={target.value} onChange={e => setTarget(t => ({ ...t, value: e.target.value }))} />
             <TextField fullWidth size="small" value={text} onChange={e => setText(e.target.value)} placeholder="Message..." />
             <Button variant="contained" onClick={send}>Send</Button>
           </Stack>

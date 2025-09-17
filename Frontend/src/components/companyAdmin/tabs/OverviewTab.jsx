@@ -17,6 +17,7 @@ import BarChart from '../charts/BarChart';
 import PieChart from '../charts/PieChart';
 import LineChart from '../charts/LineChart';
 import { getCompanyKPIs, getGlobalActivity, getSystemHealth, getTopRoutes, getBusiestDepots, getMaintenanceAlerts } from '../../../supabase/api';
+import { supabase } from '../../../supabase/client';
 
 // Company Admin Executive Control Center - Meta Dashboard
 export default function OverviewTab() {
@@ -26,6 +27,7 @@ export default function OverviewTab() {
   const [topRoutes, setTopRoutes] = useState([]);
   const [busiestDepots, setBusiestDepots] = useState([]);
   const [maintenanceAlerts, setMaintenanceAlerts] = useState([]);
+  const [fatigue, setFatigue] = useState([]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -53,6 +55,37 @@ export default function OverviewTab() {
     loadData();
     const interval = setInterval(loadData, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const since = new Date(Date.now() - 24*3600*1000).toISOString();
+        const { data } = await supabase
+          .from('trips_with_details')
+          .select('driver_id, departure_time, arrival_time')
+          .gte('departure_time', since)
+          .order('departure_time', { ascending: true });
+        const byDriver = {};
+        (data||[]).forEach(t => { (byDriver[t.driver_id] ||= []).push(t); });
+        const issues = [];
+        Object.entries(byDriver).forEach(([driver, list]) => {
+          let totalMinutes = 0; let restIssue = false;
+          for (let i=0;i<list.length;i++) {
+            const s = new Date(list[i].departure_time).getTime();
+            const e = new Date(list[i].arrival_time).getTime();
+            totalMinutes += Math.max(0, Math.round((e - s)/60000));
+            if (i>0) {
+              const prevEnd = new Date(list[i-1].arrival_time).getTime();
+              const restHours = (s - prevEnd)/3600000;
+              if (restHours < 8) restIssue = true;
+            }
+          }
+          if (totalMinutes > 600 || restIssue) issues.push({ driver_id: driver, total_minutes: totalMinutes, rest_issue: restIssue });
+        });
+        setFatigue(issues);
+      } catch {}
+    })();
   }, []);
 
   const getHealthColor = (status) => {
@@ -292,24 +325,45 @@ export default function OverviewTab() {
         </Grid>
       </Grid>
 
-      {/* Quick Actions */}
+      {/* Fatigue Alerts */}
+      <Box mt={3}>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              <WarningIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+              Fatigue Alerts
+            </Typography>
+            {(fatigue || []).length === 0 ? (
+              <Alert severity="success">No fatigue risks detected</Alert>
+            ) : (
+              <List dense>
+                {(fatigue || []).map((f, idx) => (
+                  <ListItem key={idx}>
+                    <ListItemIcon><WarningIcon color="warning" /></ListItemIcon>
+                    <ListItemText primary={`Driver ${f.driver_id}: ${Math.round(f.total_minutes/60)}h in last 24h${f.rest_issue ? ', insufficient rest' : ''}`} />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </CardContent>
+        </Card>
+      </Box>
+
+      {/* Quick Actions - updated per spec */}
       <Box mt={4}>
         <Typography variant="h6" gutterBottom>Quick Actions</Typography>
         <Stack direction="row" spacing={2} flexWrap="wrap">
-          <Button variant="contained" color="primary" startIcon={<PeopleIcon />}>
-            Create User
+          <Button variant="contained" color="secondary" startIcon={<DirectionsBusFilledIcon />} onClick={() => window.dispatchEvent(new CustomEvent('open-add-bus-to-route'))}>
+            Add Bus to Route
           </Button>
-          <Button variant="contained" color="secondary" startIcon={<DirectionsBusFilledIcon />}>
-            Add Bus
+          <Button variant="contained" color="success" startIcon={<RouteIcon />} onClick={() => window.dispatchEvent(new CustomEvent('open-add-route'))}>
+            Add Route
           </Button>
-          <Button variant="contained" color="success" startIcon={<RouteIcon />}>
-            Create Route
+          <Button variant="contained" color="primary" startIcon={<PeopleIcon />} onClick={() => window.dispatchEvent(new CustomEvent('open-assign-driver'))}>
+            Assign Driver
           </Button>
-          <Button variant="contained" color="warning" startIcon={<NotificationsIcon />}>
-            Send Announcement
-          </Button>
-          <Button variant="outlined" color="primary" startIcon={<TrendingUpIcon />}>
-            View Reports
+          <Button variant="contained" color="warning" startIcon={<PaidIcon />} onClick={() => window.location.assign('#/admin/refunds')}>
+            Pending Refunds
           </Button>
         </Stack>
       </Box>

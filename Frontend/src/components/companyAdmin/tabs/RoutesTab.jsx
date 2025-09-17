@@ -124,7 +124,7 @@ export default function RoutesTab() {
               <TableCell>
                 <Button size="small" variant="outlined" onClick={() => openActions(r)}>Actions</Button>
                 <IconButton onClick={() => openEdit(r)}><EditIcon /></IconButton>
-                <IconButton onClick={async () => { await deleteRoute(r.route_id); getCompanyRoutes().then(({ data }) => setRoutes(data || [])); }}><DeleteIcon /></IconButton>
+                <IconButton onClick={async () => { await deleteRoute(r.route_id); try { await window.supabase.from('activity_log').insert([{ company_id: window.companyId, type: 'route_delete', message: JSON.stringify({ route_id: r.route_id, by: window.userId }) }]); } catch {} getCompanyRoutes().then(({ data }) => setRoutes(data || [])); }}><DeleteIcon /></IconButton>
               </TableCell>
             </TableRow>
           ))}

@@ -67,13 +67,14 @@ export default function UsersTab() {
     URL.revokeObjectURL(url);
   };
 
-  const openNew = () => { setEditing(null); setForm({ name: '', email: '', role: 'driver', is_active: true, password_hash: '' }); setDialogOpen(true); };
-  const openEdit = (u) => { setEditing(u); setForm({ name: u.name, email: u.email, role: u.role, is_active: !!u.is_active, password_hash: '' }); setDialogOpen(true); };
+  const openNew = () => { setEditing(null); setForm({ name: '', email: '', role: 'driver', is_active: true, password_hash: '', branch_id: '' }); setDialogOpen(true); };
+  const openEdit = (u) => { setEditing(u); setForm({ name: u.name, email: u.email, role: u.role, is_active: !!u.is_active, password_hash: '', branch_id: u.branch_id || '' }); setDialogOpen(true); };
   const save = async () => {
     try {
       const name = requireString(form.name, 'Name');
       const email = requireEmail(form.email);
       const role = requireString(form.role, 'Role');
+      if (role !== 'driver' && !form.branch_id) { throw new Error('Branch is required for non-driver roles'); }
       if (editing) {
         await updateUser(editing.user_id, { name, email, role, is_active: !!form.is_active, branch_id: form.branch_id ? Number(form.branch_id) : null });
       } else {
@@ -91,7 +92,7 @@ export default function UsersTab() {
       }
       setDialogOpen(false);
       setEditing(null);
-      setForm({ name: '', email: '', role: 'driver', is_active: true, password_hash: '' });
+      setForm({ name: '', email: '', role: 'driver', is_active: true, password_hash: '', branch_id: '' });
       getCompanyUsers().then(({ data }) => setUsers(data || []));
     } catch (e) {
       alert(e?.message || 'Validation failed');
@@ -141,6 +142,7 @@ export default function UsersTab() {
             <TableCell>Name</TableCell>
             <TableCell>Email</TableCell>
             <TableCell>Role</TableCell>
+            <TableCell>Branch</TableCell>
             <TableCell>Status</TableCell>
             <TableCell>Actions</TableCell>
           </TableRow>
@@ -160,6 +162,7 @@ export default function UsersTab() {
                 </Stack>
               </TableCell>
               <TableCell>{u.role}</TableCell>
+              <TableCell>{u.branch_id || '-'}</TableCell>
               <TableCell>{u.is_active ? 'Active' : 'Inactive'}</TableCell>
               <TableCell>
                 <Button size="small" variant="outlined" onClick={() => openEmployee(u)}>Actions</Button>
@@ -172,7 +175,7 @@ export default function UsersTab() {
                     } catch {}
                   }}>Resend invite</Button>
                 )}
-                <IconButton onClick={async () => { await deleteUser(u.user_id); getCompanyUsers().then(({ data }) => setUsers(data || [])); }}><DeleteIcon /></IconButton>
+                <IconButton onClick={async () => { await deleteUser(u.user_id); try { await window.supabase.from('activity_log').insert([{ company_id: window.companyId, type: 'user_delete', message: JSON.stringify({ user_id: u.user_id, by: window.userId }) }]); } catch {} getCompanyUsers().then(({ data }) => setUsers(data || [])); }}><DeleteIcon /></IconButton>
               </TableCell>
             </TableRow>
           ))}
@@ -198,7 +201,7 @@ export default function UsersTab() {
             <MenuItem value="ops_manager">Operations Manager</MenuItem>
           </Select>
           <Select fullWidth value={form.branch_id} onChange={e => setForm(f => ({ ...f, branch_id: e.target.value }))} sx={{ mt: 2 }} displayEmpty>
-            <MenuItem value="">Assign Branch (optional)</MenuItem>
+            <MenuItem value="">{form.role === 'driver' ? 'Branch (optional for drivers)' : 'Select Branch (required)'}</MenuItem>
             {(branches||[]).map(b => <MenuItem key={b.branch_id} value={b.branch_id}>{b.name}</MenuItem>)}
           </Select>
           {!editing && <TextField label="Password" type="password" value={form.password_hash} onChange={e => setForm(f => ({ ...f, password_hash: e.target.value }))} fullWidth sx={{ mt: 2 }} helperText="In test mode, this is stored locally only" />}
