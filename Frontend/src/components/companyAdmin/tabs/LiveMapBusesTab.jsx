@@ -3,6 +3,7 @@ import { Box, Chip, Grid, Paper, Stack, Typography, Select, MenuItem } from '@mu
 import DashboardCard from '../../common/DashboardCard';
 import DataTable from '../../common/DataTable';
 import { getFleetStatus } from '../../../supabase/api';
+import CommandCenterMap from './CommandCenterMap';
 
 export default function LiveMapBusesTab() {
   const [buses, setBuses] = useState([]);
@@ -24,6 +25,11 @@ export default function LiveMapBusesTab() {
 
   return (
     <Box>
+      <Box sx={{ mb: 2 }}>
+        <DashboardCard title="Live Map" variant="elevated">
+          <CommandCenterMap />
+        </DashboardCard>
+      </Box>
       <Grid container spacing={2}>
         <Grid item xs={12} md={8}>
           <DashboardCard title="Fleet Live Status" variant="outlined" headerAction={

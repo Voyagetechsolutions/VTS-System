@@ -8,10 +8,14 @@ namespace Backend.Seeders
     public class SeedData
     {
         private readonly AppDbContext _context;
+        private readonly UserManager<IdentityUser> _userManager;
+        private readonly RoleManager<IdentityRole> _roleManager;
 
-        public SeedData(AppDbContext context)
+        public SeedData(AppDbContext context, UserManager<IdentityUser> userManager, RoleManager<IdentityRole> roleManager)
         {
             _context = context;
+            _userManager = userManager;
+            _roleManager = roleManager;
         }
 
         public async Task SeedAsync()
@@ -21,6 +25,59 @@ namespace Backend.Seeders
                 // Ensure database is created
                 await _context.Database.EnsureCreatedAsync();
 
+                // 1) Seed roles
+                var roles = new [] { "admin", "developer", "ops_manager", "booking_officer", "boarding_operator", "driver", "depot_manager", "maintenance_manager", "finance_manager", "hr_manager" };
+                foreach (var role in roles)
+                {
+                    if (!await _roleManager.RoleExistsAsync(role))
+                    {
+                        await _roleManager.CreateAsync(new IdentityRole(role));
+                    }
+                }
+
+                // 2) Seed default admin user (dev-safe defaults)
+                const string defaultAdminEmail = "admin@vts.local";
+                const string defaultAdminPassword = "Admin@12345"; // For development only; change in production
+                var existingAdmin = await _userManager.FindByEmailAsync(defaultAdminEmail);
+                if (existingAdmin == null)
+                {
+                    var adminUser = new IdentityUser { UserName = defaultAdminEmail, Email = defaultAdminEmail, EmailConfirmed = true };
+                    var createResult = await _userManager.CreateAsync(adminUser, defaultAdminPassword);
+                    if (createResult.Succeeded)
+                    {
+                        await _userManager.AddToRoleAsync(adminUser, "admin");
+
+                        // Ensure default company exists for admin
+                        var company = await _context.Companies.FirstOrDefaultAsync() ?? new Company
+                        {
+                            Name = "Alpha Transit",
+                            Address = "123 Main Street, City Center",
+                            ContactNumber = "+1-555-0101",
+                            Email = "info@alphatransit.com",
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        if (company.CompanyId == 0) {
+                            _context.Companies.Add(company);
+                            await _context.SaveChangesAsync();
+                        }
+
+                        // Link profile
+                        if (!await _context.UserProfiles.AnyAsync(u => u.Id == adminUser.Id))
+                        {
+                            _context.UserProfiles.Add(new User
+                            {
+                                Id = adminUser.Id,
+                                Email = defaultAdminEmail,
+                                Role = "admin",
+                                CompanyId = company.CompanyId,
+                                IsActive = true,
+                                CreatedAt = DateTime.UtcNow
+                            });
+                            await _context.SaveChangesAsync();
+                        }
+                    }
+                }
+
                 // Seed companies if none exist
                 if (!await _context.Companies.AnyAsync())
                 {
@@ -28,7 +85,6 @@ namespace Backend.Seeders
                     {
                         new Company
                         {
-                            CompanyId = 1,
                             Name = "Alpha Transit",
                             Address = "123 Main Street, City Center",
                             ContactNumber = "+1-555-0101",
@@ -37,7 +93,6 @@ namespace Backend.Seeders
                         },
                         new Company
                         {
-                            CompanyId = 2,
                             Name = "Beta Bus Lines",
                             Address = "456 Oak Avenue, Downtown",
                             ContactNumber = "+1-555-0102",
@@ -57,7 +112,6 @@ namespace Backend.Seeders
                     {
                         new BusRoute
                         {
-                            RouteId = 1,
                             CompanyId = 1,
                             Origin = "City Center",
                             Destination = "Airport",
@@ -67,7 +121,6 @@ namespace Backend.Seeders
                         },
                         new BusRoute
                         {
-                            RouteId = 2,
                             CompanyId = 1,
                             Origin = "Downtown",
                             Destination = "Shopping Mall",
@@ -88,7 +141,6 @@ namespace Backend.Seeders
                     {
                         new Bus
                         {
-                            BusId = 1,
                             CompanyId = 1,
                             LicensePlate = "ABC-123",
                             Capacity = 45,
@@ -97,7 +149,6 @@ namespace Backend.Seeders
                         },
                         new Bus
                         {
-                            BusId = 2,
                             CompanyId = 1,
                             LicensePlate = "XYZ-789",
                             Capacity = 30,

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Paper, Typography, TextField, Button, Alert, Divider, Stack, Link as MLink, Checkbox, FormControlLabel, IconButton, Select, MenuItem } from '@mui/material';
+import { Box, Paper, Typography, TextField, Button, Alert, Divider, Stack, Link as MLink, Checkbox, FormControlLabel, IconButton } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useNavigate } from 'react-router-dom';
@@ -11,8 +11,6 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [tenant, setTenant] = useState('');
-  const [role, setRole] = useState('');
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -21,29 +19,7 @@ export default function Login() {
 
   const USE_TEST_LOGIN = String(process.env.REACT_APP_USE_TEST_LOGIN || '').toLowerCase() === 'true';
 
-  const setSessionFromProfile = (profile) => {
-    try {
-      window.userId = profile.user_id;
-      window.companyId = profile.company_id;
-      window.userRole = profile.role;
-      window.user = { id: profile.user_id, role: profile.role, company_id: profile.company_id, name: profile.name || '' };
-      localStorage.setItem('userRole', profile.role || '');
-      localStorage.setItem('companyId', profile.company_id || '');
-      localStorage.setItem('userId', profile.user_id || '');
-    } catch {}
-  };
-
-  const routeByRole = (role) => {
-    switch (role) {
-      case 'admin': navigate('/admin-dashboard'); return;
-      case 'booking_officer': navigate('/booking-dashboard'); return;
-      case 'boarding_operator': navigate('/boarding-operator-dashboard'); return;
-      case 'driver': navigate('/driver-dashboard'); return;
-      case 'ops_manager': navigate('/ops-dashboard'); return;
-      case 'developer': navigate('/developer-dashboard'); return;
-      default: navigate('/'); return;
-    }
-  };
+  
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -51,7 +27,7 @@ export default function Login() {
     setLoading(true);
     try { seedMockUsers(); } catch {}
     try {
-      await login(email, password, role, tenant, remember);
+      await login(email, password, null, null, remember);
     } catch (err) {
       setError(err?.message || 'Login failed');
     } finally {
@@ -70,15 +46,7 @@ export default function Login() {
     }
   };
 
-  const handleOAuth = async (provider) => {
-    setError(null);
-    if (USE_TEST_LOGIN) { setError('SSO is disabled in test mode'); return; }
-    try {
-      await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: window.location.origin } });
-    } catch (e) {
-      setError(e?.message || 'OAuth sign-in failed');
-    }
-  };
+  
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f5f5f5', p: 2 }}>
@@ -97,20 +65,6 @@ export default function Login() {
               </IconButton>
             )
           }} />
-          <TextField label="Company ID (optional)" placeholder="e.g. 1" fullWidth margin="normal" value={tenant} onChange={(e) => setTenant(e.target.value)} />
-          <Select fullWidth displayEmpty value={role} onChange={(e) => setRole(e.target.value)} sx={{ mt: 1 }}>
-            <MenuItem value="">Select Role (optional)</MenuItem>
-            <MenuItem value="admin">Admin</MenuItem>
-            <MenuItem value="booking_officer">Booking Officer</MenuItem>
-            <MenuItem value="boarding_operator">Boarding Operator</MenuItem>
-            <MenuItem value="driver">Driver</MenuItem>
-            <MenuItem value="ops_manager">Operations Manager</MenuItem>
-            <MenuItem value="developer">Developer</MenuItem>
-            <MenuItem value="depot_manager">Depot Manager</MenuItem>
-            <MenuItem value="maintenance_manager">Maintenance Manager</MenuItem>
-            <MenuItem value="finance_manager">Finance Manager</MenuItem>
-            <MenuItem value="hr_manager">HR Manager</MenuItem>
-          </Select>
           <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
             <FormControlLabel control={<Checkbox checked={remember} onChange={(e) => setRemember(e.target.checked)} />} label="Remember me" />
             <MLink component="button" type="button" onClick={handleResetPassword} sx={{ fontSize: 13 }}>Forgot password?</MLink>
@@ -118,15 +72,9 @@ export default function Login() {
           <Button type="submit" disabled={loading} variant="contained" color="primary" fullWidth sx={{ mt: 1.5 }}>{loading ? 'Signing in…' : 'Login'}</Button>
         </form>
 
-        <Divider sx={{ my: 2 }}>Or continue with</Divider>
-        <Stack direction="row" spacing={1}>
-          <Button fullWidth variant="outlined" onClick={() => handleOAuth('google')} disabled={USE_TEST_LOGIN}>Google</Button>
-          <Button fullWidth variant="outlined" onClick={() => handleOAuth('azure')} disabled={USE_TEST_LOGIN}>Microsoft</Button>
-        </Stack>
-
         <Stack direction="row" spacing={1} justifyContent="center" sx={{ mt: 2 }}>
           <Typography variant="body2">Don’t have an account?</Typography>
-          <MLink href="#" onClick={(e) => { e.preventDefault(); navigate('/entry'); }} variant="body2">Sign up</MLink>
+          <MLink href="#" onClick={(e) => { e.preventDefault(); navigate('/signup'); }} variant="body2">Sign up</MLink>
         </Stack>
 
         {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}

@@ -2,7 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { Grid, Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, Select, MenuItem, TextField, Typography, Stack } from '@mui/material';
 import DashboardCard, { StatsCard, QuickActionCard } from '../../common/DashboardCard';
 import DataTable from '../../common/DataTable';
-import { getCompanyDashboardKPIs, getCompanyAlertsFeed } from '../../../supabase/api';
+import { 
+  getCompanyDashboardKPIs, 
+  getCompanyAlertsFeed,
+  getCompanyRoutes,
+  getCompanyBuses,
+  getDrivers,
+  assignBusToRoute,
+  createRoute,
+  createBus,
+  assignDriver
+} from '../../../supabase/api';
 import CommandCenterMap from './CommandCenterMap';
 
 export default function CommandCenterTab() {
@@ -11,12 +21,14 @@ export default function CommandCenterTab() {
   const [routes, setRoutes] = useState([]);
   const [buses, setBuses] = useState([]);
   const [addBusOpen, setAddBusOpen] = useState(false);
-  const [addBusForm, setAddBusForm] = useState({ route_id: '', date: '', bus_id: '' });
+  const [addBusForm, setAddBusForm] = useState({ route_id: '', bus_id: '' });
   const [addRouteOpen, setAddRouteOpen] = useState(false);
-  const [addRouteForm, setAddRouteForm] = useState({ origin: '', destination: '', departure_time: '', arrival_time: '', route_code: '' });
+  const [addRouteForm, setAddRouteForm] = useState({ origin: '', destination: '', departure_time: '', arrival_time: '', arrival_day: 'same_day', route_code: '' });
   const [assignOpen, setAssignOpen] = useState(false);
   const [drivers, setDrivers] = useState([]);
   const [assignForm, setAssignForm] = useState({ driver_id: '', bus_id: '', route_id: '' });
+  const [addNewBusOpen, setAddNewBusOpen] = useState(false);
+  const [newBusForm, setNewBusForm] = useState({ license_plate: '', capacity: 50, status: 'Active', name: '', type: '' });
 
   useEffect(() => {
     (async () => {
@@ -34,13 +46,16 @@ export default function CommandCenterTab() {
     const onOpenAddBus = () => setAddBusOpen(true);
     const onOpenAddRoute = () => setAddRouteOpen(true);
     const onOpenAssign = () => setAssignOpen(true);
+    const onOpenAddNewBus = () => setAddNewBusOpen(true);
     window.addEventListener('open-add-bus-to-route', onOpenAddBus);
     window.addEventListener('open-add-route', onOpenAddRoute);
     window.addEventListener('open-assign-driver', onOpenAssign);
+    window.addEventListener('open-add-bus', onOpenAddNewBus);
     return () => {
       window.removeEventListener('open-add-bus-to-route', onOpenAddBus);
       window.removeEventListener('open-add-route', onOpenAddRoute);
       window.removeEventListener('open-assign-driver', onOpenAssign);
+      window.removeEventListener('open-add-bus', onOpenAddNewBus);
     };
   }, []);
 
@@ -48,7 +63,7 @@ export default function CommandCenterTab() {
     { label: 'Add Bus to Route', icon: 'route_add', onClick: () => window.dispatchEvent(new CustomEvent('open-add-bus-to-route')) },
     { label: 'Add Route', icon: 'route', onClick: () => window.dispatchEvent(new CustomEvent('open-add-route')) },
     { label: 'Assign Driver', icon: 'driver', onClick: () => window.dispatchEvent(new CustomEvent('open-assign-driver')) },
-    { label: 'Issue Refunds (Pending)', icon: 'money', onClick: () => window.location.assign('#/admin/refunds') },
+    { label: 'Add Bus', icon: 'bus', onClick: () => setAddNewBusOpen(true) },
   ];
 
   return (
@@ -86,13 +101,12 @@ export default function CommandCenterTab() {
                 </MenuItem>
               ))}
             </Select>
-            <TextField type="date" label="Date" InputLabelProps={{ shrink: true }} value={addBusForm.date} onChange={e => setAddBusForm(f => ({ ...f, date: e.target.value }))} />
             <Select displayEmpty value={addBusForm.bus_id} onChange={e => setAddBusForm(f => ({ ...f, bus_id: e.target.value }))}>
               <MenuItem value="">Select Bus...</MenuItem>
               {buses.map(b => (<MenuItem key={b.bus_id} value={b.bus_id}>{b.license_plate} ({b.status||'Unknown'})</MenuItem>))}
             </Select>
             <Typography variant="body2" color="text.secondary">
-              Buses on this route for selected day will be shown in Routes → Actions
+              Assigns the selected bus to the chosen route.
             </Typography>
           </Stack>
         </DialogContent>
@@ -111,12 +125,16 @@ export default function CommandCenterTab() {
             <TextField label="Drop off (Destination)" value={addRouteForm.destination} onChange={e => setAddRouteForm(f => ({ ...f, destination: e.target.value }))} fullWidth />
             <TextField label="Departure" type="time" value={addRouteForm.departure_time} onChange={e => setAddRouteForm(f => ({ ...f, departure_time: e.target.value }))} fullWidth />
             <TextField label="Arrival" type="time" value={addRouteForm.arrival_time} onChange={e => setAddRouteForm(f => ({ ...f, arrival_time: e.target.value }))} fullWidth />
+            <Select fullWidth value={addRouteForm.arrival_day} onChange={e => setAddRouteForm(f => ({ ...f, arrival_day: e.target.value }))}>
+              <MenuItem value="same_day">Arrival Day: Same Day</MenuItem>
+              <MenuItem value="next_day">Arrival Day: Next Day</MenuItem>
+            </Select>
             <TextField label="Route ID/Code" value={addRouteForm.route_code} onChange={e => setAddRouteForm(f => ({ ...f, route_code: e.target.value }))} fullWidth />
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setAddRouteOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={async () => { const payload = { origin: addRouteForm.origin, destination: addRouteForm.destination, departure_times: addRouteForm.departure_time ? [addRouteForm.departure_time] : [], arrival_times: addRouteForm.arrival_time ? [addRouteForm.arrival_time] : [], frequency: 'Daily', route_code: addRouteForm.route_code || null }; await createRoute(payload); setAddRouteOpen(false); }}>Create</Button>
+          <Button variant="contained" onClick={async () => { const payload = { origin: addRouteForm.origin, destination: addRouteForm.destination, departure_times: addRouteForm.departure_time ? [addRouteForm.departure_time] : [], arrival_times: addRouteForm.arrival_time ? [addRouteForm.arrival_time] : [], arrival_day: addRouteForm.arrival_day, frequency: 'Daily', route_code: addRouteForm.route_code || null }; await createRoute(payload); setAddRouteOpen(false); }}>Create</Button>
         </DialogActions>
       </Dialog>
 

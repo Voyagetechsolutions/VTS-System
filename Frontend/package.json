@@ -10,6 +10,7 @@
     "@sentry/react": "^7.120.4",
     "@sentry/tracing": "^7.119.0",
     "@supabase/supabase-js": "^2.56.0",
+    "@microsoft/signalr": "^8.0.6",
     "axios": "^1.6.0",
     "bcryptjs": "^3.0.2",
     "html5-qrcode": "^2.3.8",

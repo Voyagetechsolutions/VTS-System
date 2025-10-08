@@ -39,7 +39,7 @@ import {
   Business as BusinessIcon
 } from '@mui/icons-material';
 import { supabase } from '../../supabase/client';
-import { getBranches } from '../../supabase/api';
+import { getBranches, getCompanyAlertsFeed } from '../../supabase/api';
 import { Icon, roleNavigation } from '../common/IconMap';
 import theme from '../../styles/theme';
 import '../../styles/globalStyles.css';
@@ -53,7 +53,12 @@ export default function SidebarLayout({ children, title, navItems }) {
   const [anchorEl, setAnchorEl] = useState(null);
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState('');
-  const [expandedGroups, setExpandedGroups] = useState({});
+  const [expandedGroups, setExpandedGroups] = useState(
+    JSON.parse(localStorage.getItem('expandedGroups') || '{}')
+  );
+  const [notificationsCount, setNotificationsCount] = useState(
+    JSON.parse(localStorage.getItem('notificationsCount') || '0')
+  );
 
   const muiTheme = useTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
@@ -64,6 +69,15 @@ export default function SidebarLayout({ children, title, navItems }) {
     // Auto-collapse sidebar on tablets
     if (isTablet && !isMobile) {
       setSidebarCollapsed(true);
+      // Load notifications count
+(async () => {
+  try {
+    const { data } = await getCompanyAlertsFeed();
+    setNotificationsCount((data || []).length);
+  } catch {
+    setNotificationsCount(0);
+  }
+})();
     }
   }, [isTablet, isMobile]);
 
@@ -484,7 +498,7 @@ export default function SidebarLayout({ children, title, navItems }) {
               }
             }}
           >
-            <Badge badgeContent={4} color="error">
+            <Badge badgeContent={notificationsCount} color="error">
               <NotificationsIcon />
             </Badge>
           </IconButton>

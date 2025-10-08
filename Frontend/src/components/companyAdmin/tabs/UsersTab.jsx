@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Table, TableHead, TableRow, TableCell, TableBody, TablePagination, Button, TextField, Select, MenuItem, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Stack, Divider, Chip, Tooltip, Box } from '@mui/material';
-import { getCompanyUsers, createUser, updateUser, deleteUser, getBranches } from '../../../supabase/api';
+import { getCompanyUsers, createUser, updateUser, deleteUser, getBranches } from '../../../database';
 import { requireString, requireEmail } from '../../../utils/validation';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';

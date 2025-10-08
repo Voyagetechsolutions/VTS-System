@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Grid, Box } from '@mui/material';
 import DashboardCard from '../../common/DashboardCard';
 import DataTable from '../../common/DataTable';
-import { getDrivers, listTripSchedules, listDriverTraining, upsertDriverTraining, listDriverKPIs, listDriverShifts, upsertDriverShift } from '../../../supabase/api';
+import { getDrivers, listTripSchedules, listDriverTraining, upsertDriverTraining, listDriverKPIs, listDriverShifts, upsertDriverShift } from '../../../database';
 import { ModernTextField, ModernSelect, ModernButton } from '../../common/FormComponents';
 
 export default function DriverHubTab() {

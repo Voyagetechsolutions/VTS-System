@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using Backend.Data;
 using Backend.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class ApiKeysController : ControllerBase
     {
         private readonly AppDbContext _db;

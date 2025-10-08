@@ -22,6 +22,8 @@ namespace Backend.Data
         public DbSet<Message> Messages { get; set; }
         public DbSet<Announcement> Announcements { get; set; }
         public DbSet<Incident> Incidents { get; set; }
+        public DbSet<BusLocationHistory> BusLocationHistories { get; set; }
+        public DbSet<Alert> Alerts { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -200,6 +202,47 @@ namespace Backend.Data
                 entity.HasOne(e => e.Bus)
                       .WithMany()
                       .HasForeignKey(e => e.BusId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Configure BusLocationHistory entity
+            modelBuilder.Entity<BusLocationHistory>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Status).HasMaxLength(50);
+                entity.Property(e => e.Latitude).HasColumnType("decimal(9,6)");
+                entity.Property(e => e.Longitude).HasColumnType("decimal(9,6)");
+                entity.Property(e => e.Speed).HasColumnType("decimal(5,2)");
+                entity.HasIndex(e => new { e.CompanyId, e.BusId, e.Timestamp });
+                entity.HasOne(e => e.Bus)
+                      .WithMany()
+                      .HasForeignKey(e => e.BusId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.Company)
+                      .WithMany()
+                      .HasForeignKey(e => e.CompanyId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Configure Alert entity
+            modelBuilder.Entity<Alert>(entity =>
+            {
+                entity.HasKey(e => e.AlertId);
+                entity.Property(e => e.Type).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.Message).IsRequired().HasMaxLength(250);
+                entity.Property(e => e.Severity).HasMaxLength(20);
+                entity.HasIndex(e => new { e.CompanyId, e.Timestamp });
+                entity.HasOne(e => e.Company)
+                      .WithMany()
+                      .HasForeignKey(e => e.CompanyId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.Bus)
+                      .WithMany()
+                      .HasForeignKey(e => e.BusId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.Trip)
+                      .WithMany()
+                      .HasForeignKey(e => e.TripId)
                       .OnDelete(DeleteBehavior.Restrict);
             });
         }

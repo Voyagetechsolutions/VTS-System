@@ -2,10 +2,12 @@ using Microsoft.AspNetCore.Mvc;
 using Backend.Models;
 using Backend.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Backend.Controllers {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class CommunicationController : ControllerBase {
         private readonly AppDbContext _db;
         public CommunicationController(AppDbContext db) { _db = db; }

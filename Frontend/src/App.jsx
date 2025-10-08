@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ThemeProvider, CssBaseline, IconButton } from '@mui/material';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { ThemeProvider, CssBaseline, IconButton, TextField, Button, Stack, AppBar, Toolbar, Typography, Box } from '@mui/material';
+import { useSnackbar } from 'notistack';
+import api from './utils/apiClient';
 import { SnackbarProvider } from 'notistack';
 import { createTheme } from '@mui/material/styles';
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -15,16 +17,63 @@ const CompanyAdminDashboard = React.lazy(() => import('./pages/CompanyAdminDashb
 const OperationsManagerDashboard = React.lazy(() => import('./pages/OperationsManagerDashboard/index'));
 const BookingOfficeDashboard = React.lazy(() => import('./pages/BookingOfficeDashboard/index'));
 const BoardingOperatorDashboard = React.lazy(() => import('./pages/BoardingOperatorDashboard/index'));
-import EntryPoint from './pages/EntryPoint';
+import Signup from './pages/Signup';
 const DriverDashboard = React.lazy(() => import('./pages/DriverDashboard/index'));
 const DepotManagerDashboard = React.lazy(() => import('./pages/DepotManagerDashboard/index'));
 const MaintenanceManagerDashboard = React.lazy(() => import('./pages/MaintenanceManagerDashboard/index'));
 const FinanceDashboard = React.lazy(() => import('./pages/FinanceDashboard/index'));
 const HRDashboard = React.lazy(() => import('./pages/HRDashboard/index'));
+const FleetTracking = React.lazy(() => import('./pages/FleetTracking/index'));
 import Login from './pages/Login';
 
 function App() {
   const [mode, setMode] = useState('light');
+  const [companyIdInput, setCompanyIdInput] = useState('');
+  const { enqueueSnackbar } = useSnackbar();
+  const TopBar = () => {
+    const location = useLocation();
+    const show = location.pathname !== '/';
+    if (!show) return null;
+    return (
+      <AppBar position="fixed" color="default" elevation={1}>
+        <Toolbar>
+          <Typography variant="h6" sx={{ flexGrow: 1 }}>VTS</Typography>
+          <IconButton color="inherit" onClick={toggleMode} aria-label="toggle theme" size="small" sx={{ mr: 1 }}>
+            {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
+          </IconButton>
+          <TextField
+            size="small"
+            label="Company ID"
+            value={companyIdInput}
+            onChange={e => setCompanyIdInput(e.target.value)}
+            sx={{ width: 140, mr: 1 }}
+          />
+          <Button
+            variant="contained"
+            size="small"
+            onClick={() => {
+              try {
+                const v = (companyIdInput || '').trim();
+                window.companyId = v || null;
+                if (v) localStorage.setItem('companyId', v); else localStorage.removeItem('companyId');
+                enqueueSnackbar('Company ID updated', { variant: 'success' });
+              } catch {}
+            }}
+            sx={{ mr: 1 }}
+          >Set</Button>
+          <Button
+            variant="outlined"
+            size="small"
+            color="secondary"
+            onClick={async () => {
+              try { await api.logout(); } catch {}
+              try { window.location.assign('/'); } catch { window.location.href = '/'; }
+            }}
+          >Logout</Button>
+        </Toolbar>
+      </AppBar>
+    );
+  };
   useEffect(() => {
     // Initialize window.companyId and window.userRole from Supabase auth
     (async () => {
@@ -42,6 +91,10 @@ function App() {
         if (!window.user?.id) { try { const uid = localStorage.getItem('userId'); if (uid) window.user = { ...(window.user||{}), id: uid, role: window.userRole }; } catch {} }
       } catch {}
     })();
+  }, []);
+  useEffect(() => {
+    // initialize input from current companyId
+    try { setCompanyIdInput((window.companyId ?? localStorage.getItem('companyId') ?? '') + ''); } catch {}
   }, []);
   useEffect(() => {
     // Global auth listener to keep context synced after recoverable errors
@@ -79,15 +132,13 @@ function App() {
       <SnackbarProvider maxSnack={3} autoHideDuration={3000} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
         <ErrorBoundary>
           <Router>
-            <div style={{ position: 'fixed', right: 12, bottom: 12, zIndex: 9999 }}>
-              <IconButton color="inherit" onClick={toggleMode} aria-label="toggle theme">
-                {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
-              </IconButton>
-            </div>
+            <TopBar />
+            <Toolbar />
+            <Box sx={{ px: 0 }}>
             <Suspense fallback={null}>
             <Routes>
               <Route path="/" element={<Login />} />
-              <Route path="/entry" element={<EntryPoint />} />
+              <Route path="/signup" element={<Signup />} />
               <Route path="/developer-dashboard" element={<DeveloperDashboard />} />
               <Route path="/admin-dashboard" element={<CompanyAdminDashboard />} />
               <Route path="/ops-dashboard" element={<OperationsManagerDashboard />} />
@@ -98,8 +149,10 @@ function App() {
               <Route path="/maintenance-dashboard" element={<MaintenanceManagerDashboard />} />
               <Route path="/finance-dashboard" element={<FinanceDashboard />} />
               <Route path="/hr-dashboard" element={<HRDashboard />} />
+              <Route path="/fleet-tracking" element={<FleetTracking />} />
             </Routes>
             </Suspense>
+            </Box>
           </Router>
         </ErrorBoundary>
       </SnackbarProvider>

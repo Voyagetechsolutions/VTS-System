@@ -5,7 +5,7 @@ namespace Backend.SignalR
 {
     public class BusTrackingHub : Hub
     {
-        public async Task UpdateBusLocation(string busId, double latitude, double longitude, string status)
+        public async Task UpdateBusLocation(string busId, double latitude, double longitude, string status, string? companyId = null)
         {
             var busLocation = new
             {
@@ -16,7 +16,15 @@ namespace Backend.SignalR
                 Timestamp = DateTime.UtcNow
             };
 
-            await Clients.All.SendAsync("BusLocationUpdated", busLocation);
+            if (!string.IsNullOrWhiteSpace(companyId))
+            {
+                await Clients.Group($"company_{companyId}").SendAsync("BusLocationUpdated", busLocation);
+            }
+            else
+            {
+                // Fallback: broadcast if company not specified (consider denying in production)
+                await Clients.All.SendAsync("BusLocationUpdated", busLocation);
+            }
         }
 
         public async Task SendAlert(string companyId, string message, string severity)
@@ -29,7 +37,7 @@ namespace Backend.SignalR
                 Timestamp = DateTime.UtcNow
             };
 
-            await Clients.All.SendAsync("AlertReceived", alert);
+            await Clients.Group($"company_{companyId}").SendAsync("AlertReceived", alert);
         }
 
         public async Task JoinCompanyGroup(string companyId)

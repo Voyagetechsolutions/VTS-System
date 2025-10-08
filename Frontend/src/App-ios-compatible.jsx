@@ -42,7 +42,7 @@ try {
   HRDashboard = () => React.createElement('div', null, 'Loading Dashboard...');
 }
 
-import EntryPoint from './pages/EntryPoint';
+import Signup from './pages/Signup';
 import Login from './pages/Login';
 
 // iOS-safe storage helpers
@@ -273,7 +273,7 @@ function App() {
           React.createElement(Suspense, { fallback: null },
             React.createElement(Routes, null,
               React.createElement(Route, { path: '/', element: React.createElement(Login) }),
-              React.createElement(Route, { path: '/entry', element: React.createElement(EntryPoint) }),
+              React.createElement(Route, { path: '/signup', element: React.createElement(Signup) }),
               React.createElement(Route, { path: '/developer-dashboard', element: React.createElement(DeveloperDashboard) }),
               React.createElement(Route, { path: '/admin-dashboard', element: React.createElement(CompanyAdminDashboard) }),
               React.createElement(Route, { path: '/ops-dashboard', element: React.createElement(OperationsManagerDashboard) }),

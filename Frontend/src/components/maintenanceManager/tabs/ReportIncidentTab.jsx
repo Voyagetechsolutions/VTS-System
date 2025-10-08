@@ -35,7 +35,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
   Report as ReportIcon,
-  Bus as BusIcon,
+  DirectionsBus as BusIcon,
   Person as PersonIcon,
   DateRange as DateRangeIcon
 } from '@mui/icons-material';

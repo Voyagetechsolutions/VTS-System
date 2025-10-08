@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Backend.Models
 {
@@ -19,6 +20,11 @@ namespace Backend.Models
         
         [StringLength(100)]
         public string? TransactionId { get; set; }
+
+        // Optional link to booking
+        public int? BookingId { get; set; }
+        [ForeignKey(nameof(BookingId))]
+        public virtual Booking? Booking { get; set; }
         
         public DateTime CreatedAt { get; set; }
         

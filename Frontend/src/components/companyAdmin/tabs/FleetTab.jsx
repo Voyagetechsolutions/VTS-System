@@ -78,7 +78,7 @@ export default function FleetTab() {
     }
     setDialogOpen(false);
     setEditing(null);
-    setForm({ name: '', type: '', model: '', license_plate: '', capacity: 50, config: '2x2', features: { wifi: false, ac: false, charging: false, recliner: false, toilet: false }, insured: false, permit_number: '', status: 'Active', insurance: '', maintenance_logs: [] });
+    setForm({ name: '', type: '', model: '', license_plate: '', capacity: 50, config: '2x2', features: { wifi: false, ac: false, charging: false, recliner: false, toilet: false }, insured: false, permit_number: '', status: 'Active', insurance: '' });
     load();
   };
 
@@ -163,8 +163,6 @@ export default function FleetTab() {
           <FormControlLabel control={<Checkbox checked={!!form.feature_toilet} onChange={e => setForm(f => ({ ...f, feature_toilet: e.target.checked }))} />} label="Toilet" />
           <FormControlLabel control={<Checkbox checked={!!form.insured} onChange={e => setForm(f => ({ ...f, insured: e.target.checked }))} />} label="Insured" />
           <TextField label="Permit Number (optional)" value={form.permit_number} onChange={e => setForm(f => ({ ...f, permit_number: e.target.value }))} fullWidth sx={{ mt: 2 }} />
-          <TextField label="Insurance" value={form.insurance} onChange={e => setForm(f => ({ ...f, insurance: e.target.value }))} fullWidth sx={{ mt: 2 }} />
-          <TextField label="Maintenance Logs (JSON)" value={JSON.stringify(form.maintenance_logs)} onChange={e => { try { setForm(f => ({ ...f, maintenance_logs: JSON.parse(e.target.value || '[]') })); } catch {} }} fullWidth sx={{ mt: 2 }} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
