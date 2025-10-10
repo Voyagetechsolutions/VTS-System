@@ -6,6 +6,11 @@ using Backend.Services;
 using Backend.Payments;
 using Backend.Logging;
 using Backend.Seeders;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using Microsoft.AspNetCore.Authorization;
+using Backend.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,23 +19,30 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// HttpContext accessor for custom authorization handler
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient();
+
 // Add SignalR for real-time updates
 builder.Services.AddSignalR();
 
-// Add CORS
+// Add CORS (for cookies, we must not use AllowAnyOrigin)
+var frontendOrigin = builder.Configuration["FrontendOrigin"] ?? "http://localhost:3000";
+var additionalOrigin = builder.Configuration["AdditionalFrontendOrigin"] ?? "http://127.0.0.1:3000";
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("Frontend", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(new[] { frontendOrigin, additionalOrigin })
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 
-// Add DbContext
+// Add DbContext - Use SQLite for easier testing
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlite("Data Source=busmgmt.db"));
 
 // Add Identity
 builder.Services.AddIdentity<IdentityUser, IdentityRole>()
@@ -49,16 +61,48 @@ builder.Services.Configure<IdentityOptions>(options =>
 });
 
 // Add JWT Authentication
+var jwtSection = builder.Configuration.GetSection("JwtSettings");
+var secretKey = jwtSection["SecretKey"] ?? "";
+
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme = "Bearer";
-    options.DefaultChallengeScheme = "Bearer";
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = !string.IsNullOrEmpty(jwtSection["Issuer"]),
+        ValidIssuer = jwtSection["Issuer"],
+        ValidateAudience = !string.IsNullOrEmpty(jwtSection["Audience"]),
+        ValidAudience = jwtSection["Audience"],
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.FromMinutes(2)
+    };
+});
+
+// Add Authorization with company scoping policy
+builder.Services.AddSingleton<IAuthorizationHandler, CompanyScopeHandler>();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("CompanyScoped", policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.AddRequirements(new CompanyScopeRequirement());
+    });
 });
 
 // Add Services
 builder.Services.AddScoped<StripeService>();
 builder.Services.AddScoped<PayGateService>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddSingleton<IEmailService, EmailService>();
+builder.Services.AddScoped<SupabaseAdminService>();
+builder.Services.AddScoped<SupabaseRestService>();
 
 // Add Logging
 builder.Services.AddApplicationInsightsTelemetry();
@@ -71,10 +115,34 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    // In development, avoid forcing HTTPS to prevent mixed content or self-signed cert issues
 }
 
-app.UseHttpsRedirection();
-app.UseCors("AllowAll");
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+app.UseCors("Frontend");
+
+// Centralized exception handling
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception ex)
+    {
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
+        var payload = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            error = app.Environment.IsDevelopment() ? ex.Message : "An unexpected error occurred.",
+            stack = app.Environment.IsDevelopment() ? ex.StackTrace : null
+        });
+        await context.Response.WriteAsync(payload);
+    }
+});
 app.UseAuthentication();
 app.UseAuthorization();
 

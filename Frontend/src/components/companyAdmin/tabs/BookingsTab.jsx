@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Table, TableHead, TableRow, TableCell, TableBody, TablePagination, Button, TextField, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, Stack, Divider, Grid, Paper, Typography } from '@mui/material';
 import BarChart from '../charts/BarChart';
 import { supabase } from '../../../supabase/client';
-import { getCompanyBookings, createBooking, updateBooking, deleteBooking, getCompanyRoutes, getCompanyBuses } from '../../../supabase/api';
+import { getCompanyBookings, createBooking, updateBooking, deleteBooking, getCompanyRoutes, getCompanyBuses, getCompanySettings } from '../../../supabase/api';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 
@@ -10,6 +10,9 @@ export default function BookingsTab() {
   const [bookings, setBookings] = useState([]);
   const [branchChart, setBranchChart] = useState([]);
   const [channelChart, setChannelChart] = useState([]);
+  const [routeChart, setRouteChart] = useState([]);
+  const [hourChart, setHourChart] = useState([]);
+  const [departHourChart, setDepartHourChart] = useState([]);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -20,12 +23,85 @@ export default function BookingsTab() {
   const [busOptions, setBusOptions] = useState([]);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ passenger_name: '', seat_number: 1, booking_date: new Date().toISOString(), payment_status: 'unpaid', booking_source: 'app' });
+  const [canEdit, setCanEdit] = useState(true);
+
+  const dailySales = useMemo(() => {
+    const byDay = new Map();
+    (bookings||[]).forEach(b => {
+      const d = (b.booking_date || b.created_at || '').slice(0,10);
+      if (d) byDay.set(d, (byDay.get(d)||0) + 1);
+    });
+    return Array.from(byDay.entries()).sort((a,b)=> new Date(a[0]) - new Date(b[0]));
+  }, [bookings]);
+
+  // Bookings by Route (bar) - fallback client aggregation
+  const byRouteClient = useMemo(() => {
+    const map = new Map();
+    (bookings||[]).forEach(b => {
+      const key = b.route_id || 'Unknown';
+      map.set(key, (map.get(key)||0) + 1);
+    });
+    const labelOf = (rid) => {
+      const r = (routeOptions||[]).find(x => x.route_id === rid);
+      return r ? `${r.origin} → ${r.destination}` : String(rid).slice(0,6);
+    };
+    return Array.from(map.entries()).map(([rid, v]) => ({ label: labelOf(rid), value: v })).sort((a,b)=>b.value-a.value).slice(0,10);
+  }, [bookings, routeOptions]);
+  const byRoute = routeChart && routeChart.length ? routeChart : byRouteClient;
+
+  // Time-of-Day density (0-23) based on booking_date
+  const byHourClient = useMemo(() => {
+    const arr = Array.from({length:24}, (_,h)=>({ label: `${h}:00`, value: 0 }));
+    (bookings||[]).forEach(b => {
+      const d = b.booking_date ? new Date(b.booking_date) : null;
+      if (!d) return;
+      const h = d.getHours();
+      arr[h].value += 1;
+    });
+    return arr;
+  }, [bookings]);
+  const byHour = (hourChart && hourChart.length) ? hourChart : byHourClient;
+
+  // Schedule Departures by Hour (server preferred)
+  const byDepartHour = useMemo(() => {
+    if (departHourChart && departHourChart.length) return departHourChart;
+    // Fallback: use bookings distribution as a proxy if schedule RPC not available
+    return byHourClient;
+  }, [departHourChart, byHourClient]);
+
+  const LineChart = ({ data, width = 520, height = 200, color = '#1976d2' }) => {
+    if (!data.length) return <svg width={width} height={height} />;
+    const values = data.map(([, v]) => v);
+    const max = Math.max(1, ...values);
+    const stepX = (width - 40) / Math.max(1, data.length - 1);
+    const points = data.map(([, v], i) => {
+      const x = 20 + i * stepX;
+      const y = height - 20 - Math.round((v / max) * (height - 40));
+      return `${x},${y}`;
+    }).join(' ');
+    return (
+      <svg width={width} height={height} style={{ background: 'transparent' }}>
+        <polyline points={points} fill="none" stroke={color} strokeWidth="2" />
+        {data.map(([label, v], i) => {
+          const x = 20 + i * stepX;
+          const y = height - 20 - Math.round((v / max) * (height - 40));
+          return <circle key={label} cx={x} cy={y} r={2} fill={color} />;
+        })}
+        <text x={4} y={12} fontSize="11" fill="#444">Daily Ticket Sales</text>
+      </svg>
+    );
+  };
 
   useEffect(() => {
     (async () => {
       getCompanyBookings().then(({ data }) => setBookings(data || []));
       getCompanyRoutes().then(({ data }) => setRouteOptions(data || []));
       getCompanyBuses().then(({ data }) => setBusOptions(data || []));
+      try {
+        const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole') || 'admin';
+        const { data: settings } = await getCompanySettings();
+        setCanEdit(!!(settings?.rbac?.[role]?.edit));
+      } catch { setCanEdit(true); }
       try {
         const cid = window.companyId;
         const { data: byBranch } = await supabase.rpc('bookings_by_branch', { p_company_id: cid });
@@ -35,6 +111,37 @@ export default function BookingsTab() {
         const cid = window.companyId;
         const { data: byChannel } = await supabase.rpc('bookings_by_channel', { p_company_id: cid });
         setChannelChart((byChannel || []).map(r => ({ label: String(r.channel||'Unknown'), value: Number(r.count||0) })));
+      } catch {}
+      try {
+        const cid = window.companyId;
+        const { data: byRouteRpc } = await supabase.rpc('bookings_by_route', { p_company_id: cid });
+        if (Array.isArray(byRouteRpc)) {
+          setRouteChart(byRouteRpc.map(r => ({ label: r.route_label || `${r.origin||''} → ${r.destination||''}` || String(r.route_id||'Unknown'), value: Number(r.count||0) })));
+        }
+      } catch {}
+      try {
+        const cid = window.companyId;
+        const { data: byHourRpc } = await supabase.rpc('bookings_by_hour', { p_company_id: cid });
+        if (Array.isArray(byHourRpc)) {
+          const arr = Array.from({ length: 24 }, (_, h) => ({ label: `${h}:00`, value: 0 }));
+          byHourRpc.forEach(r => {
+            const h = Number(r.hour);
+            if (h >= 0 && h < 24) arr[h].value = Number(r.count || 0);
+          });
+          setHourChart(arr);
+        }
+      } catch {}
+      try {
+        const cid = window.companyId;
+        const { data: byDepartRpc } = await supabase.rpc('departures_by_hour', { p_company_id: cid });
+        if (Array.isArray(byDepartRpc)) {
+          const arr = Array.from({ length: 24 }, (_, h) => ({ label: `${h}:00`, value: 0 }));
+          byDepartRpc.forEach(r => {
+            const h = Number(r.hour);
+            if (h >= 0 && h < 24) arr[h].value = Number(r.count || 0);
+          });
+          setDepartHourChart(arr);
+        }
       } catch {}
     })();
   }, []);
@@ -140,9 +247,34 @@ export default function BookingsTab() {
             <BarChart data={channelChart} />
           </Paper>
         </Grid>
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6">Bookings by Route</Typography>
+            <BarChart data={byRoute} />
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6">Time of Day</Typography>
+            <BarChart data={byHour} />
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6">Departures by Hour (Schedules)</Typography>
+            <BarChart data={byDepartHour} />
+          </Paper>
+        </Grid>
+        <Grid item xs={12}>
+          <Paper sx={{ p: 2 }}>
+            <LineChart data={dailySales} />
+          </Paper>
+        </Grid>
       </Grid>
       <TextField label="Search Bookings" value={search} onChange={e => setSearch(e.target.value)} sx={{ mb: 2 }} />
-      <Button variant="contained" color="primary" sx={{ mb: 2 }} onClick={openNew}>Add Booking</Button>
+      {canEdit && (
+        <Button variant="contained" color="primary" sx={{ mb: 2 }} onClick={openNew}>Add Booking</Button>
+      )}
       <Table>
         <TableHead>
           <TableRow>
@@ -159,9 +291,11 @@ export default function BookingsTab() {
               <TableCell>{b.seat_number}</TableCell>
               <TableCell>{b.departure ? new Date(b.departure).toLocaleString() : '-'}</TableCell>
               <TableCell>
-                <Button size="small" variant="outlined" onClick={() => openActions(b)}>Actions</Button>
-                <IconButton onClick={() => openEdit(b)}><EditIcon /></IconButton>
-                <IconButton onClick={async () => { await deleteBooking(b.booking_id); try { await supabase.from('activity_log').insert([{ company_id: window.companyId, type: 'booking_delete', message: JSON.stringify({ booking_id: b.booking_id, by: window.userId }) }]); } catch {} getCompanyBookings().then(({ data }) => setBookings(data || [])); }}><DeleteIcon /></IconButton>
+                {canEdit && <Button size="small" variant="outlined" onClick={() => openActions(b)}>Actions</Button>}
+                {canEdit && <IconButton onClick={() => openEdit(b)}><EditIcon /></IconButton>}
+                {canEdit && (
+                  <IconButton onClick={async () => { await deleteBooking(b.booking_id); try { await supabase.from('activity_log').insert([{ company_id: window.companyId, type: 'booking_delete', message: JSON.stringify({ booking_id: b.booking_id, by: window.userId }) }]); } catch {} getCompanyBookings().then(({ data }) => setBookings(data || [])); }}><DeleteIcon /></IconButton>
+                )}
               </TableCell>
             </TableRow>
           ))}
@@ -195,7 +329,7 @@ export default function BookingsTab() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={save}>Save</Button>
+          {canEdit && <Button variant="contained" onClick={save}>Save</Button>}
         </DialogActions>
       </Dialog>
 
@@ -262,8 +396,8 @@ export default function BookingsTab() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setActionsOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={saveActions}>Save</Button>
+          <Button onClick={() => setActionsOpen(false)}>Close</Button>
+          {canEdit && <Button variant="contained" onClick={saveActions}>Save</Button>}
         </DialogActions>
       </Dialog>
     </>

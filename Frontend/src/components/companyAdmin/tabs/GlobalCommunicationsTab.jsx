@@ -4,7 +4,7 @@ import {
   List, ListItem, ListItemText, ListItemIcon, Chip, Alert, 
   Stack, Divider, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Select, MenuItem, FormControl, InputLabel, Switch,
-  FormControlLabel, Checkbox, FormGroup
+  FormControlLabel, Checkbox, FormGroup, Snackbar
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import AnnouncementIcon from '@mui/icons-material/Announcement';
@@ -15,7 +15,7 @@ import WarningIcon from '@mui/icons-material/Warning';
 import InfoIcon from '@mui/icons-material/Info';
 import { 
   getAnnouncements, createAnnouncement, getNotificationPolicies,
-  updateNotificationPolicy, sendGlobalMessage, getMessageTemplates
+  updateNotificationPolicy, sendGlobalMessage, getMessageTemplates, getChannelStatus
 } from '../../../supabase/api';
 
 // Company Admin Global Communications Dashboard
@@ -23,6 +23,9 @@ export default function GlobalCommunicationsTab() {
   const [announcements, setAnnouncements] = useState([]);
   const [notificationPolicies, setNotificationPolicies] = useState([]);
   const [messageTemplates, setMessageTemplates] = useState([]);
+  const [channelStatus, setChannelStatus] = useState({});
+  const [lastChannelStatus, setLastChannelStatus] = useState({});
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [announcementDialog, setAnnouncementDialog] = useState(false);
   const [policyDialog, setPolicyDialog] = useState(false);
   const [selectedPolicy, setSelectedPolicy] = useState(null);
@@ -48,19 +51,34 @@ export default function GlobalCommunicationsTab() {
 
   useEffect(() => {
     loadData();
+    const t = setInterval(loadData, 30000);
+    return () => clearInterval(t);
   }, []);
 
   const loadData = async () => {
     try {
-      const [announcementsRes, policiesRes, templatesRes] = await Promise.all([
+      const [announcementsRes, policiesRes, templatesRes, channelsRes] = await Promise.all([
         getAnnouncements(),
         getNotificationPolicies(),
-        getMessageTemplates()
+        getMessageTemplates(),
+        getChannelStatus()
       ]);
       
       setAnnouncements(announcementsRes.data || []);
       setNotificationPolicies(policiesRes.data || []);
       setMessageTemplates(templatesRes.data || []);
+      const next = channelsRes.data || {};
+      // detect flips and toast
+      const services = ['email','sms','push','in_app'];
+      services.forEach(svc => {
+        const prev = (lastChannelStatus[svc]?.status || 'active');
+        const curr = (next[svc]?.status || 'active');
+        if (prev !== curr) {
+          setSnackbar({ open: true, message: `${svc.toUpperCase()} is now ${curr.toUpperCase()}`, severity: curr === 'down' ? 'error' : curr === 'degraded' ? 'warning' : 'success' });
+        }
+      });
+      setLastChannelStatus(next);
+      setChannelStatus(next);
     } catch (error) {
       console.error('Failed to load communications data:', error);
     }
@@ -163,6 +181,7 @@ export default function GlobalCommunicationsTab() {
           >
             Email Templates
           </Button>
+          <Button variant="outlined" onClick={loadData}>Refresh Health</Button>
         </Stack>
       </Box>
 
@@ -260,28 +279,28 @@ export default function GlobalCommunicationsTab() {
                   <Box display="flex" alignItems="center" gap={1}>
                     <EmailIcon color="primary" />
                     <Typography>Email Service</Typography>
-                    <Chip label="Active" color="success" size="small" />
+                    <Chip label={(channelStatus.email?.status || 'active').toUpperCase()} color={channelStatus.email?.status === 'down' ? 'error' : channelStatus.email?.status === 'degraded' ? 'warning' : 'success'} size="small" />
                   </Box>
                 </Grid>
                 <Grid item xs={12} md={3}>
                   <Box display="flex" alignItems="center" gap={1}>
                     <SmsIcon color="primary" />
                     <Typography>SMS Service</Typography>
-                    <Chip label="Active" color="success" size="small" />
+                    <Chip label={(channelStatus.sms?.status || 'active').toUpperCase()} color={channelStatus.sms?.status === 'down' ? 'error' : channelStatus.sms?.status === 'degraded' ? 'warning' : 'success'} size="small" />
                   </Box>
                 </Grid>
                 <Grid item xs={12} md={3}>
                   <Box display="flex" alignItems="center" gap={1}>
                     <NotificationsIcon color="primary" />
                     <Typography>Push Notifications</Typography>
-                    <Chip label="Active" color="success" size="small" />
+                    <Chip label={(channelStatus.push?.status || 'active').toUpperCase()} color={channelStatus.push?.status === 'down' ? 'error' : channelStatus.push?.status === 'degraded' ? 'warning' : 'success'} size="small" />
                   </Box>
                 </Grid>
                 <Grid item xs={12} md={3}>
                   <Box display="flex" alignItems="center" gap={1}>
                     <AnnouncementIcon color="primary" />
                     <Typography>In-App Messages</Typography>
-                    <Chip label="Active" color="success" size="small" />
+                    <Chip label={(channelStatus.in_app?.status || 'active').toUpperCase()} color={channelStatus.in_app?.status === 'down' ? 'error' : channelStatus.in_app?.status === 'degraded' ? 'warning' : 'success'} size="small" />
                   </Box>
                 </Grid>
               </Grid>
@@ -289,6 +308,14 @@ export default function GlobalCommunicationsTab() {
           </Card>
         </Grid>
       </Grid>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        message={snackbar.message}
+      />
 
       {/* Send Announcement Dialog */}
       <Dialog open={announcementDialog} onClose={() => setAnnouncementDialog(false)} maxWidth="md" fullWidth>

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Box } from '@mui/material';
+import { Box, Alert } from '@mui/material';
 import SidebarLayout from '../../components/layout/SidebarLayout';
 import CommandCenterTab from '../../components/companyAdmin/tabs/CommandCenterTab';
 import UsersTab from '../../components/companyAdmin/tabs/UsersTab';
@@ -8,7 +8,7 @@ import FleetTab from '../../components/companyAdmin/tabs/FleetTab';
 import RoutesTab from '../../components/companyAdmin/tabs/RoutesTab';
 import MaintenanceTab from '../../components/companyAdmin/tabs/MaintenanceTab';
 import FuelTab from '../../components/companyAdmin/tabs/FuelTab';
-import SchedulingTab from '../../components/companyAdmin/tabs/SchedulingTab';
+import TripSchedulingTab from '../../components/companyAdmin/tabs/TripSchedulingTab';
 import BookingsTab from '../../components/companyAdmin/tabs/BookingsTab';
 import FinanceCenterTab from '../../components/companyAdmin/tabs/FinanceCenterTab';
 import ReportsTab from '../../components/companyAdmin/tabs/ReportsTab';
@@ -23,6 +23,7 @@ import AuditTrailTab from '../../components/tabs/AuditTrailTab';
 import ProfileSettingsTab from '../../components/tabs/ProfileSettingsTab';
 import BranchesTab from '../../components/companyAdmin/tabs/BranchesTab';
 import TripInfoTab from '../../components/tabs/TripInfoTab';
+import { getCompanySettings, getDatabaseReadiness } from '../../supabase/api';
 import ApprovalsTab from '../../components/companyAdmin/tabs/ApprovalsTab';
 import GlobalCommunicationsTab from '../../components/companyAdmin/tabs/GlobalCommunicationsTab';
 import OversightMapTab from '../../components/companyAdmin/tabs/OversightMapTab';
@@ -39,7 +40,7 @@ import DepotOpsSupervisorTab from '../../components/depotManager/tabs/OpsSupervi
 import DepotDispatchTab from '../../components/depotManager/tabs/DispatchTab';
 import DepotStaffShiftTab from '../../components/depotManager/tabs/StaffShiftTab';
 
-const tabList = [
+const baseTabList = [
   { label: 'Executive Overview', icon: 'dashboard', group: 'Command Center' },
   { label: 'Approvals & Oversight', icon: 'approval', group: 'Command Center' },
   { label: 'Global Communications', icon: 'announcement', group: 'Command Center' },
@@ -80,7 +81,7 @@ const tabList = [
   { label: 'Profile', icon: 'profile', group: 'Customization & Settings' }
 ];
 
-const tabComponents = [
+const baseTabComponents = [
   <CommandCenterTab />, // Executive Overview
   <ApprovalsTab />,     // Approvals & Oversight
   <GlobalCommunicationsTab />, // Global Communications
@@ -99,7 +100,7 @@ const tabComponents = [
   <ReportsTab />,      // Reports & Analytics
   <AuditTrailTab scope="admin" />, // Audit Trail
   // Extended operations and centers (order aligned with tabList)
-  <MaintenanceTab />, <FuelTab />, <SchedulingTab />,
+  <MaintenanceTab />, <FuelTab />, <TripSchedulingTab />,
   // Depot manager capabilities
   <DepotOpsSupervisorTab />, <DepotDispatchTab />, <DepotStaffShiftTab />,
   // Inventory & Finance centers
@@ -111,18 +112,68 @@ const tabComponents = [
 
 export default function CompanyAdminDashboard() {
   const [tab, setTab] = React.useState(0);
+  const [tabs, setTabs] = React.useState(baseTabList);
+  const [comps, setComps] = React.useState(baseTabComponents);
+  const [dbReady, setDbReady] = React.useState({ views: {}, tables: {} });
+  const [missing, setMissing] = React.useState([]);
   useEffect(() => {
     // Simple RBAC guard: only allow admin role
     const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole');
     if (role && role !== 'admin') {
       window.location.replace('/');
     }
+    // Load module visibility and apply if configured
+    (async () => {
+      try {
+        const roleKey = role || 'admin';
+        const { data } = await getCompanySettings();
+        const allowed = data?.modules_visibility?.[roleKey];
+        if (Array.isArray(allowed) && allowed.length > 0) {
+          // Build a map from label to index in base list
+          const keepIndices = baseTabList
+            .map((t, idx) => ({ idx, label: t.label }))
+            .filter(x => allowed.includes(x.label))
+            .map(x => x.idx);
+          const filteredTabs = baseTabList.filter((_, idx) => keepIndices.includes(idx));
+          const filteredComps = baseTabComponents.filter((_, idx) => keepIndices.includes(idx));
+          if (filteredTabs.length > 0) {
+            setTabs(filteredTabs);
+            setComps(filteredComps);
+            setTab(0);
+          }
+        }
+      } catch {}
+      try {
+        const { data } = await getDatabaseReadiness();
+        setDbReady(data || { views: {}, tables: {} });
+        const missingList = [];
+        Object.entries(data?.views || {}).forEach(([k, v]) => { if (!v) missingList.push(k); });
+        Object.entries(data?.tables || {}).forEach(([k, v]) => { if (!v) missingList.push(k); });
+        setMissing(missingList);
+      } catch {}
+    })();
+    const t = setInterval(async () => {
+      try {
+        const { data } = await getDatabaseReadiness();
+        setDbReady(data || { views: {}, tables: {} });
+        const missingList = [];
+        Object.entries(data?.views || {}).forEach(([k, v]) => { if (!v) missingList.push(k); });
+        Object.entries(data?.tables || {}).forEach(([k, v]) => { if (!v) missingList.push(k); });
+        setMissing(missingList);
+      } catch {}
+    }, 60000);
+    return () => clearInterval(t);
   }, []);
-  const navItems = tabList.map((item, idx) => ({ label: item.label, icon: item.icon, group: item.group, selected: tab === idx, onClick: () => setTab(idx) }));
+  const navItems = tabs.map((item, idx) => ({ label: item.label, icon: item.icon, group: item.group, selected: tab === idx, onClick: () => setTab(idx) }));
   return (
     <SidebarLayout navItems={navItems} title="Company Admin">
       <Box className="fade-in" sx={{ overflow: 'hidden', width: '100%' }}>
-        {tabComponents[tab]}
+        {missing.length > 0 && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Database migrations pending. Missing resources: {missing.join(', ')}. You can continue using the app; these modules will show limited data until migrations are applied.
+          </Alert>
+        )}
+        {comps[tab]}
       </Box>
     </SidebarLayout>
   );

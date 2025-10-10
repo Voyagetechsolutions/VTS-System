@@ -2,14 +2,17 @@ using Microsoft.AspNetCore.Mvc;
 using Backend.Models;
 using Backend.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Backend.Controllers {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "CompanyScoped")]
     public class PaymentController : ControllerBase {
         private readonly AppDbContext _db;
         public PaymentController(AppDbContext db) { _db = db; }
         // GET: api/payment
+        [Authorize(Roles = "admin,developer,finance_manager")]
         [HttpGet]
         public async Task<IActionResult> GetPayments([FromQuery] int? companyId = null) {
             var cid = companyId;
@@ -21,6 +24,7 @@ namespace Backend.Controllers {
             return Ok(items);
         }
         // POST: api/payment
+        [Authorize(Roles = "admin,developer,finance_manager")]
         [HttpPost]
         public async Task<IActionResult> CreatePayment([FromBody] Payment payment) {
             if (payment == null) return BadRequest();

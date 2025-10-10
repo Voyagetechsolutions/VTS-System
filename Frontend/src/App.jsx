@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, CssBaseline, IconButton } from '@mui/material';
 import { SnackbarProvider } from 'notistack';
 import { createTheme } from '@mui/material/styles';
@@ -22,6 +22,12 @@ const MaintenanceManagerDashboard = React.lazy(() => import('./pages/Maintenance
 const FinanceDashboard = React.lazy(() => import('./pages/FinanceDashboard/index'));
 const HRDashboard = React.lazy(() => import('./pages/HRDashboard/index'));
 import Login from './pages/Login';
+import AcceptInvite from './pages/AcceptInvite';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import InvitationsAdmin from './pages/Admin/Invitations';
+import RequireRoles from './components/auth/RequireRoles';
+import RequireAuth from './components/auth/RequireAuth';
 
 function App() {
   const [mode, setMode] = useState('light');
@@ -86,18 +92,28 @@ function App() {
             </div>
             <Suspense fallback={null}>
             <Routes>
-              <Route path="/" element={<Login />} />
-              <Route path="/entry" element={<EntryPoint />} />
-              <Route path="/developer-dashboard" element={<DeveloperDashboard />} />
-              <Route path="/admin-dashboard" element={<CompanyAdminDashboard />} />
-              <Route path="/ops-dashboard" element={<OperationsManagerDashboard />} />
-              <Route path="/booking-dashboard" element={<BookingOfficeDashboard />} />
-              <Route path="/boarding-operator-dashboard" element={<BoardingOperatorDashboard />} />
-              <Route path="/driver-dashboard" element={<DriverDashboard />} />
-              <Route path="/depot-dashboard" element={<DepotManagerDashboard />} />
-              <Route path="/maintenance-dashboard" element={<MaintenanceManagerDashboard />} />
-              <Route path="/finance-dashboard" element={<FinanceDashboard />} />
-              <Route path="/hr-dashboard" element={<HRDashboard />} />
+              <Route path="/" element={<Navigate to="/login" replace />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/entry" element={<RequireAuth><EntryPoint /></RequireAuth>} />
+              <Route path="/accept-invite" element={<AcceptInvite />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/admin/invitations" element={
+                <RequireRoles roles={["admin","developer","company_admin"]}>
+                  <InvitationsAdmin />
+                </RequireRoles>
+              } />
+              <Route path="/developer-dashboard" element={<RequireAuth><DeveloperDashboard /></RequireAuth>} />
+              <Route path="/admin-dashboard" element={<RequireAuth><CompanyAdminDashboard /></RequireAuth>} />
+              <Route path="/ops-dashboard" element={<RequireAuth><OperationsManagerDashboard /></RequireAuth>} />
+              <Route path="/booking-dashboard" element={<RequireAuth><BookingOfficeDashboard /></RequireAuth>} />
+              <Route path="/boarding-operator-dashboard" element={<RequireAuth><BoardingOperatorDashboard /></RequireAuth>} />
+              <Route path="/driver-dashboard" element={<RequireAuth><DriverDashboard /></RequireAuth>} />
+              <Route path="/depot-dashboard" element={<RequireAuth><DepotManagerDashboard /></RequireAuth>} />
+              <Route path="/maintenance-dashboard" element={<RequireAuth><MaintenanceManagerDashboard /></RequireAuth>} />
+              <Route path="/finance-dashboard" element={<RequireAuth><FinanceDashboard /></RequireAuth>} />
+              <Route path="/hr-dashboard" element={<RequireAuth><HRDashboard /></RequireAuth>} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
             </Suspense>
           </Router>

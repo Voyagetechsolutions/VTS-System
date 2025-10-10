@@ -2,15 +2,18 @@ using Microsoft.AspNetCore.Mvc;
 using Backend.Models;
 using Backend.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Backend.Controllers {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "CompanyScoped")]
     public class IncidentController : ControllerBase {
         private readonly AppDbContext _db;
         public IncidentController(AppDbContext db) { _db = db; }
 
         // GET: api/incident
+        [Authorize(Roles = "admin,developer,ops_manager,maintenance_manager")]
         [HttpGet]
         public async Task<IActionResult> GetIncidents([FromQuery] int? companyId = null, [FromQuery] string? status = null, [FromQuery] string? severity = null) {
             var cid = companyId;
@@ -43,6 +46,7 @@ namespace Backend.Controllers {
         }
 
         // POST: api/incident
+        [Authorize(Roles = "admin,developer,ops_manager,maintenance_manager")]
         [HttpPost]
         public async Task<IActionResult> CreateIncident([FromBody] Incident incident) {
             if (incident == null) return BadRequest("Incident data is required");
@@ -63,6 +67,7 @@ namespace Backend.Controllers {
         }
 
         // PUT: api/incident/{id}
+        [Authorize(Roles = "admin,developer,ops_manager,maintenance_manager")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateIncident(int id, [FromBody] Incident incident) {
             if (id != incident.IncidentId) return BadRequest();
@@ -87,6 +92,7 @@ namespace Backend.Controllers {
         }
 
         // PUT: api/incident/{id}/assign
+        [Authorize(Roles = "admin,developer,ops_manager,maintenance_manager")]
         [HttpPut("{id}/assign")]
         public async Task<IActionResult> AssignIncident(int id, [FromBody] AssignIncidentRequest request) {
             var incident = await _db.Incidents.FindAsync(id);
@@ -100,6 +106,7 @@ namespace Backend.Controllers {
         }
 
         // PUT: api/incident/{id}/resolve
+        [Authorize(Roles = "admin,developer,ops_manager,maintenance_manager")]
         [HttpPut("{id}/resolve")]
         public async Task<IActionResult> ResolveIncident(int id, [FromBody] ResolveIncidentRequest request) {
             var incident = await _db.Incidents.FindAsync(id);

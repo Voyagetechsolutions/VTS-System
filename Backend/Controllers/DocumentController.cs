@@ -2,15 +2,18 @@ using Microsoft.AspNetCore.Mvc;
 using Backend.Models;
 using Backend.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Backend.Controllers {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "CompanyScoped")]
     public class DocumentController : ControllerBase {
         private readonly AppDbContext _db;
         public DocumentController(AppDbContext db) { _db = db; }
 
         // GET: api/document
+        [Authorize(Roles = "admin,developer,ops_manager,hr_manager")]
         [HttpGet]
         public async Task<IActionResult> GetDocuments([FromQuery] int? companyId = null, [FromQuery] string? userId = null, [FromQuery] string? type = null) {
             var cid = companyId;
@@ -37,6 +40,7 @@ namespace Backend.Controllers {
         }
 
         // POST: api/document
+        [Authorize(Roles = "admin,developer,ops_manager,hr_manager")]
         [HttpPost]
         public async Task<IActionResult> CreateDocument([FromBody] Document document) {
             if (document == null) return BadRequest("Document data is required");
@@ -56,6 +60,7 @@ namespace Backend.Controllers {
         }
 
         // PUT: api/document/{id}
+        [Authorize(Roles = "admin,developer,ops_manager,hr_manager")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateDocument(int id, [FromBody] Document document) {
             if (id != document.DocumentId) return BadRequest();
@@ -74,6 +79,7 @@ namespace Backend.Controllers {
         }
 
         // DELETE: api/document/{id}
+        [Authorize(Roles = "admin,developer,ops_manager,hr_manager")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteDocument(int id) {
             var document = await _db.Documents.FindAsync(id);

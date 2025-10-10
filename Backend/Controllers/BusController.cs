@@ -2,15 +2,18 @@ using Microsoft.AspNetCore.Mvc;
 using Backend.Models;
 using Backend.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Backend.Controllers {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "CompanyScoped")]
     public class BusController : ControllerBase {
         private readonly AppDbContext _db;
         public BusController(AppDbContext db) { _db = db; }
 
         // GET: api/bus?companyId=1
+        [Authorize(Roles = "admin,developer,ops_manager")]
         [HttpGet]
         public async Task<IActionResult> GetBuses([FromQuery] int? companyId) {
             var query = _db.Buses.AsNoTracking();
@@ -30,6 +33,7 @@ namespace Backend.Controllers {
         }
 
         // POST: api/bus
+        [Authorize(Roles = "admin,developer,ops_manager")]
         [HttpPost]
         public async Task<IActionResult> CreateBus([FromBody] Bus bus) {
             if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -40,6 +44,7 @@ namespace Backend.Controllers {
         }
 
         // PUT: api/bus/{id}
+        [Authorize(Roles = "admin,developer,ops_manager")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateBus(int id, [FromBody] Bus update) {
             var existing = await _db.Buses.FindAsync(id);
@@ -52,6 +57,7 @@ namespace Backend.Controllers {
         }
 
         // DELETE: api/bus/{id}
+        [Authorize(Roles = "admin,developer,ops_manager")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteBus(int id) {
             var existing = await _db.Buses.FindAsync(id);

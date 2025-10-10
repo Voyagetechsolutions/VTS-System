@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Table, TableHead, TableRow, TableCell, TableBody, TablePagination, Button, TextField, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, Stack, Divider } from '@mui/material';
-import { getCompanyRoutes, createRoute, updateRoute, deleteRoute, getCountries, getCities, getRouteStopsTable, upsertRouteStopsTable, deleteRouteStopById, getRouteSchedulesTable, upsertRouteScheduleTable, deleteRouteScheduleById, getCompanyBuses, getDrivers, assignBusToRoute, assignDriverToRoute } from '../../../supabase/api';
+import { getCompanyRoutes, createRoute, updateRoute, deleteRoute, getCountries, getCities, getRouteStopsTable, upsertRouteStopsTable, deleteRouteStopById, getRouteSchedulesTable, upsertRouteScheduleTable, deleteRouteScheduleById, getCompanyBuses, getDrivers, assignBusToRoute, assignDriverToRoute, getCompanySettings } from '../../../supabase/api';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 
@@ -21,8 +21,9 @@ export default function RoutesTab() {
   const [busOptions, setBusOptions] = useState([]);
   const [driverOptions, setDriverOptions] = useState([]);
   const [assign, setAssign] = useState({ bus_id: '', driver_id: '' });
+  const [canEdit, setCanEdit] = useState(true);
 
-  useEffect(() => { getCompanyRoutes().then(({ data }) => setRoutes(data || [])); getCountries().then(res => setCountries(res.data || [])); }, []);
+  useEffect(() => { getCompanyRoutes().then(({ data }) => setRoutes(data || [])); getCountries().then(res => setCountries(res.data || [])); (async () => { try { const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole') || 'admin'; const { data } = await getCompanySettings(); setCanEdit(!!(data?.rbac?.[role]?.edit)); } catch { setCanEdit(true); } })(); }, []);
   useEffect(() => { if (form.country_id) getCities(form.country_id).then(res => setCities(res.data || [])); }, [form.country_id]);
 
   const filtered = routes.filter(r => (r.origin || '').toLowerCase().includes(search.toLowerCase()) || (r.destination || '').toLowerCase().includes(search.toLowerCase()))
@@ -99,7 +100,7 @@ export default function RoutesTab() {
   return (
     <>
       <TextField label="Search Routes" value={search} onChange={e => setSearch(e.target.value)} sx={{ mb: 2 }} />
-      <Button variant="contained" color="primary" sx={{ mb: 2 }} onClick={openNew}>Add Route</Button>
+      {canEdit && <Button variant="contained" color="primary" sx={{ mb: 2 }} onClick={openNew}>Add Route</Button>}
       <Table>
         <TableHead>
           <TableRow>
@@ -122,9 +123,11 @@ export default function RoutesTab() {
               <TableCell>{r.frequency || '-'}</TableCell>
               <TableCell>{r.price != null ? Number(r.price) : '-'}</TableCell>
               <TableCell>
-                <Button size="small" variant="outlined" onClick={() => openActions(r)}>Actions</Button>
-                <IconButton onClick={() => openEdit(r)}><EditIcon /></IconButton>
-                <IconButton onClick={async () => { await deleteRoute(r.route_id); try { await window.supabase.from('activity_log').insert([{ company_id: window.companyId, type: 'route_delete', message: JSON.stringify({ route_id: r.route_id, by: window.userId }) }]); } catch {} getCompanyRoutes().then(({ data }) => setRoutes(data || [])); }}><DeleteIcon /></IconButton>
+                {canEdit && <Button size="small" variant="outlined" onClick={() => openActions(r)}>Actions</Button>}
+                {canEdit && <IconButton onClick={() => openEdit(r)}><EditIcon /></IconButton>}
+                {canEdit && (
+                  <IconButton onClick={async () => { await deleteRoute(r.route_id); try { await window.supabase.from('activity_log').insert([{ company_id: window.companyId, type: 'route_delete', message: JSON.stringify({ route_id: r.route_id, by: window.userId }) }]); } catch {} getCompanyRoutes().then(({ data }) => setRoutes(data || [])); }}><DeleteIcon /></IconButton>
+                )}
               </TableCell>
             </TableRow>
           ))}
@@ -165,7 +168,7 @@ export default function RoutesTab() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={save}>Save</Button>
+          {canEdit && <Button variant="contained" onClick={save}>Save</Button>}
         </DialogActions>
       </Dialog>
 
@@ -239,8 +242,8 @@ export default function RoutesTab() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setActionsOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={saveActions}>Save</Button>
+          <Button onClick={() => setActionsOpen(false)}>Close</Button>
+          {canEdit && <Button variant="contained" onClick={saveActions}>Save</Button>}
         </DialogActions>
       </Dialog>
     </>

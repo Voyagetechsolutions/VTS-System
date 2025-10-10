@@ -2,14 +2,17 @@ using Microsoft.AspNetCore.Mvc;
 using Backend.Models;
 using Backend.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Backend.Controllers {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "CompanyScoped")]
     public class AuditLogController : ControllerBase {
         private readonly AppDbContext _db;
         public AuditLogController(AppDbContext db) { _db = db; }
         // GET: api/auditlog
+        [Authorize(Roles = "admin,developer")]
         [HttpGet]
         public async Task<IActionResult> GetAuditLogs([FromQuery] int? companyId = null) {
             var cid = companyId;

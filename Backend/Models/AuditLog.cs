@@ -19,14 +19,21 @@ namespace Backend.Models
         
         public string? UserId { get; set; }
         
+        public int? CompanyId { get; set; }
+        
         public string? OldValues { get; set; }
         
         public string? NewValues { get; set; }
         
         public DateTime CreatedAt { get; set; }
         
+        public DateTime Timestamp { get; set; }
+        
         public string? IpAddress { get; set; }
         
         public string? UserAgent { get; set; }
+        
+        // Navigation properties
+        public virtual Company? Company { get; set; }
     }
 }

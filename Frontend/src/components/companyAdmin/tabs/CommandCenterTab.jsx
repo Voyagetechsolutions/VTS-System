@@ -2,11 +2,23 @@ import React, { useEffect, useState } from 'react';
 import { Grid, Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, Select, MenuItem, TextField, Typography, Stack } from '@mui/material';
 import DashboardCard, { StatsCard, QuickActionCard } from '../../common/DashboardCard';
 import DataTable from '../../common/DataTable';
-import { getCompanyDashboardKPIs, getCompanyAlertsFeed } from '../../../supabase/api';
 import CommandCenterMap from './CommandCenterMap';
+import {
+  getCompanyDashboardKPIs,
+  getCompanyAlertsFeed,
+  getCompanyRoutes,
+  getCompanyBuses,
+  getDrivers,
+  assignBusToRoute,
+  createRoute,
+  assignDriver,
+  getLargeRefunds,
+  getAdminOversightSnapshot,
+  getOpenIncidentsCount,
+} from '../../../supabase/api';
 
 export default function CommandCenterTab() {
-  const [kpis, setKpis] = useState({ activeTrips: 0, passengersToday: 0, revenueToday: 0, incidentsOpen: 0 });
+  const [kpis, setKpis] = useState({ activeTrips: 0, passengersToday: 0, revenueToday: 0, incidentsOpen: 0, refundsPending: 0, staffUtilization: 0 });
   const [alerts, setAlerts] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [buses, setBuses] = useState([]);
@@ -18,29 +30,56 @@ export default function CommandCenterTab() {
   const [drivers, setDrivers] = useState([]);
   const [assignForm, setAssignForm] = useState({ driver_id: '', bus_id: '', route_id: '' });
 
+  const loadDashboard = async () => {
+    try {
+      const [r, snapshot, refunds, openInc] = await Promise.all([
+        getCompanyDashboardKPIs(),
+        getAdminOversightSnapshot(),
+        getLargeRefunds(),
+        getOpenIncidentsCount(),
+      ]);
+      const base = r?.data || {};
+      const staffUtil = Number(snapshot?.data?.ops?.utilizationPct || snapshot?.data?.utilization?.pct || 0);
+      const refundsPending = Array.isArray(refunds?.data) ? refunds.data.length : Number(refunds?.data || 0);
+      const incidentsOpen = Number(openInc?.data || base.incidentsOpen || 0);
+      setKpis(k => ({
+        ...k,
+        activeTrips: Number(base.activeTrips || 0),
+        passengersToday: Number(base.passengersToday || 0),
+        revenueToday: Number(base.revenueToday || 0),
+        incidentsOpen,
+        refundsPending,
+        staffUtilization: staffUtil,
+      }));
+    } catch {}
+    try {
+      const a = await getCompanyAlertsFeed();
+      setAlerts(a.data || []);
+    } catch {}
+    try {
+      const [{ data: routeList }, { data: busList }, { data: driverList }] = await Promise.all([
+        getCompanyRoutes(), getCompanyBuses(), getDrivers()
+      ]);
+      setRoutes(routeList || []);
+      setBuses(busList || []);
+      setDrivers(driverList || []);
+    } catch {}
+  };
+
   useEffect(() => {
-    (async () => {
-      try { const r = await getCompanyDashboardKPIs(); if (r?.data) setKpis(r.data); } catch {}
-      try { const a = await getCompanyAlertsFeed(); setAlerts(a.data || []); } catch {}
-      try {
-        const [{ data: routeList }, { data: busList }, { data: driverList }] = await Promise.all([
-          getCompanyRoutes(), getCompanyBuses(), getDrivers()
-        ]);
-        setRoutes(routeList || []);
-        setBuses(busList || []);
-        setDrivers(driverList || []);
-      } catch {}
-    })();
+    loadDashboard();
     const onOpenAddBus = () => setAddBusOpen(true);
     const onOpenAddRoute = () => setAddRouteOpen(true);
     const onOpenAssign = () => setAssignOpen(true);
     window.addEventListener('open-add-bus-to-route', onOpenAddBus);
     window.addEventListener('open-add-route', onOpenAddRoute);
     window.addEventListener('open-assign-driver', onOpenAssign);
+    const t = setInterval(loadDashboard, 30000);
     return () => {
       window.removeEventListener('open-add-bus-to-route', onOpenAddBus);
       window.removeEventListener('open-add-route', onOpenAddRoute);
       window.removeEventListener('open-assign-driver', onOpenAssign);
+      clearInterval(t);
     };
   }, []);
 
@@ -61,17 +100,38 @@ export default function CommandCenterTab() {
 
       <Grid item xs={12}>
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6} md={3}><StatsCard title="Active Trips" value={kpis.activeTrips} icon="trips" color="info" /></Grid>
-          <Grid item xs={12} sm={6} md={3}><StatsCard title="Passengers Today" value={kpis.passengersToday} icon="passengers" color="primary" /></Grid>
-          <Grid item xs={12} sm={6} md={3}><StatsCard title="Revenue Today" value={`$${Number(kpis.revenueToday||0).toLocaleString()}`} icon="revenue" color="success" /></Grid>
-          <Grid item xs={12} sm={6} md={3}><StatsCard title="Open Incidents" value={kpis.incidentsOpen} icon="incident" color="warning" /></Grid>
+          <Grid item xs={12} sm={6} md={2}><StatsCard title="Active Trips" value={kpis.activeTrips} icon="trips" color="info" /></Grid>
+          <Grid item xs={12} sm={6} md={2}><StatsCard title="Passengers Today" value={kpis.passengersToday} icon="passengers" color="primary" /></Grid>
+          <Grid item xs={12} sm={6} md={2}><StatsCard title="Revenue Today" value={`$${Number(kpis.revenueToday||0).toLocaleString()}`} icon="revenue" color="success" /></Grid>
+          <Grid item xs={12} sm={6} md={2}><StatsCard title="Open Incidents" value={kpis.incidentsOpen} icon="incident" color="warning" /></Grid>
+          <Grid item xs={12} sm={6} md={2}><StatsCard title="Refunds Pending" value={kpis.refundsPending} icon="money" color="secondary" /></Grid>
+          <Grid item xs={12} sm={6} md={2}><StatsCard title="Staff Utilization" value={`${Number(kpis.staffUtilization||0)}%`} icon="users" color="info" /></Grid>
         </Grid>
       </Grid>
 
       <Grid item xs={12} md={4}>
         <QuickActionCard title="Quick Actions" actions={actions} />
       </Grid>
-      {/* Removed Alerts & Activity per spec */}
+      <Grid item xs={12} md={8}>
+        <DashboardCard title="Recent Activity">
+          <DataTable
+            pagination={true}
+            data={(alerts||[]).map(a => ({
+              event: a.event || a.type || a.title || a.action || 'Activity',
+              category: a.category || a.module || a.scope || '-',
+              date: a.created_at || a.timestamp || a.date || null,
+              status: a.status || a.level || a.result || '-',
+            }))}
+            columns={[
+              { field: 'event', headerName: 'Event' },
+              { field: 'category', headerName: 'Category' },
+              { field: 'date', headerName: 'Date', type: 'date' },
+              { field: 'status', headerName: 'Status', type: 'status' },
+            ]}
+            emptyMessage="No recent activity"
+          />
+        </DashboardCard>
+      </Grid>
 
       {/* Add Bus to Route Dialog */}
       <Dialog open={addBusOpen} onClose={() => setAddBusOpen(false)} maxWidth="sm" fullWidth>

@@ -2,15 +2,18 @@ using Microsoft.AspNetCore.Mvc;
 using Backend.Models;
 using Backend.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Backend.Controllers {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class CompanyController : ControllerBase {
         private readonly AppDbContext _db;
         public CompanyController(AppDbContext db) { _db = db; }
 
         // GET: api/company?search=&status=
+        [Authorize(Roles = "developer,admin")]
         [HttpGet]
         public async Task<IActionResult> GetCompanies([FromQuery] string? search = null, [FromQuery] string? status = null) {
             var query = _db.Companies.AsNoTracking();
@@ -37,6 +40,7 @@ namespace Backend.Controllers {
         }
 
         // POST: api/company
+        [Authorize(Roles = "developer,admin")]
         [HttpPost]
         public async Task<IActionResult> CreateCompany([FromBody] Company company) {
             if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -47,6 +51,7 @@ namespace Backend.Controllers {
         }
 
         // PUT: api/company/{id}
+        [Authorize(Roles = "developer,admin")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateCompany(int id, [FromBody] Company update) {
             var existing = await _db.Companies.FindAsync(id);
@@ -60,6 +65,7 @@ namespace Backend.Controllers {
         }
 
         // DELETE: api/company/{id}
+        [Authorize(Roles = "developer,admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteCompany(int id) {
             var existing = await _db.Companies.FindAsync(id);

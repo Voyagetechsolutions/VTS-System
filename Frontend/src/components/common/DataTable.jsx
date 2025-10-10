@@ -390,6 +390,7 @@ const DataTable = ({
               // Data rows (virtualized slice when enabled)
               effectiveData.rows.map((row, indexRel) => {
                 const index = effectiveData.startIndex + indexRel;
+                return (
                 <TableRow
                   key={index}
                   selected={selected.includes(index)}
@@ -454,6 +455,7 @@ const DataTable = ({
                     </TableCell>
                   )}
                 </TableRow>
+                );
               })
             )}
           </TableBody>

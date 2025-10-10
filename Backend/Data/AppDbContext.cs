@@ -22,6 +22,9 @@ namespace Backend.Data
         public DbSet<Message> Messages { get; set; }
         public DbSet<Announcement> Announcements { get; set; }
         public DbSet<Incident> Incidents { get; set; }
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
+        public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
+        public DbSet<Invitation> Invitations { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -41,7 +44,10 @@ namespace Backend.Data
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Email).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.PasswordHash).IsRequired();
                 entity.Property(e => e.Role).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.Name).HasMaxLength(100);
+                entity.Property(e => e.PhoneNumber).HasMaxLength(20);
                 entity.HasOne(e => e.Company)
                       .WithMany(c => c.Users)
                       .HasForeignKey(e => e.CompanyId)
@@ -113,6 +119,10 @@ namespace Backend.Data
                 entity.HasKey(e => e.AuditLogId);
                 entity.Property(e => e.Action).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.EntityName).IsRequired().HasMaxLength(100);
+                entity.HasOne(e => e.Company)
+                      .WithMany()
+                      .HasForeignKey(e => e.CompanyId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             // Configure Document entity
@@ -201,6 +211,41 @@ namespace Backend.Data
                       .WithMany()
                       .HasForeignKey(e => e.BusId)
                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Configure RefreshToken entity
+            modelBuilder.Entity<RefreshToken>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.TokenHash).IsRequired();
+                entity.Property(e => e.UserId).IsRequired();
+                entity.HasOne<User>()
+                      .WithMany()
+                      .HasForeignKey(e => e.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Configure PasswordResetToken entity
+            modelBuilder.Entity<PasswordResetToken>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.TokenHash).IsRequired();
+                entity.Property(e => e.UserId).IsRequired();
+                entity.HasIndex(e => new { e.UserId, e.TokenHash });
+                entity.HasOne<User>()
+                      .WithMany()
+                      .HasForeignKey(e => e.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Invitation entity
+            modelBuilder.Entity<Invitation>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Email).IsRequired();
+                entity.Property(e => e.Role).IsRequired();
+                entity.Property(e => e.TokenHash).IsRequired();
+                entity.HasIndex(e => new { e.Email, e.TokenHash });
             });
         }
     }

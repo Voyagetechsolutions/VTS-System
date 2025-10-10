@@ -2,15 +2,18 @@ using Microsoft.AspNetCore.Mvc;
 using Backend.Models;
 using Backend.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Backend.Controllers {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "CompanyScoped")]
     public class RouteController : ControllerBase {
         private readonly AppDbContext _db;
         public RouteController(AppDbContext db) { _db = db; }
 
         // GET: api/route?companyId=1
+        [Authorize(Roles = "admin,developer,ops_manager")]
         [HttpGet]
         public async Task<IActionResult> GetRoutes([FromQuery] int? companyId) {
             var query = _db.Routes.AsNoTracking();
@@ -32,6 +35,7 @@ namespace Backend.Controllers {
         }
 
         // POST: api/route
+        [Authorize(Roles = "admin,developer,ops_manager")]
         [HttpPost]
         public async Task<IActionResult> CreateRoute([FromBody] BusRoute route) {
             if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -42,6 +46,7 @@ namespace Backend.Controllers {
         }
 
         // PUT: api/route/{id}
+        [Authorize(Roles = "admin,developer,ops_manager")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateRoute(int id, [FromBody] BusRoute update) {
             var existing = await _db.Routes.FindAsync(id);
@@ -56,6 +61,7 @@ namespace Backend.Controllers {
         }
 
         // DELETE: api/route/{id}
+        [Authorize(Roles = "admin,developer,ops_manager")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteRoute(int id) {
             var existing = await _db.Routes.FindAsync(id);

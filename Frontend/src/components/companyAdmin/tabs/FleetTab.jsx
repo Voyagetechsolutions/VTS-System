@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Table, TableHead, TableRow, TableCell, TableBody, TablePagination, Button, TextField, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, Checkbox, FormControlLabel, Alert, Stack, Divider } from '@mui/material';
-import { getCompanyBuses, createBus, updateBus, deleteBus, getDrivers } from '../../../supabase/api';
+import { getCompanyBuses, createBus, updateBus, deleteBus, getDrivers, getCompanySettings } from '../../../supabase/api';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 
@@ -11,12 +11,13 @@ export default function FleetTab() {
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
-  const [actionsForm, setActionsForm] = useState({ make: '', year_of_manufacture: '', ownership_company: '', insurance_details: '', permit_number: '', roadworthiness_certificate_no: '', roadworthiness_issued_at: '', roadworthiness_expires_at: '' });
+  const [actionsForm, setActionsForm] = useState({ make: '', year_of_manufacture: '', ownership_company: '', insurance_details: '', permit_number: '', roadworthiness_certificate_no: '', roadworthiness_issued_at: '', roadworthiness_expires_at: '', health_status: '', status_notes: '' });
   const [drivers, setDrivers] = useState([]);
   const [assign, setAssign] = useState({ driver_id: '', driver_license: '', driver_contact: '' });
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ name: '', type: '', model: '', license_plate: '', capacity: 50, config: '2x2', feature_wifi: false, feature_ac: false, feature_charging: false, feature_recliner: false, feature_toilet: false, insured: false, permit_number: '', status: 'Active', insurance: '' });
   const [error, setError] = useState('');
+  const [canEdit, setCanEdit] = useState(true);
 
   const load = async () => {
     const { data } = await getCompanyBuses();
@@ -24,6 +25,7 @@ export default function FleetTab() {
   };
 
   useEffect(() => { load(); }, []);
+  useEffect(() => { (async () => { try { const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole') || 'admin'; const { data } = await getCompanySettings(); setCanEdit(!!(data?.rbac?.[role]?.edit)); } catch { setCanEdit(true); } })(); }, []);
   useEffect(() => { (async () => { const { data } = await getDrivers(); setDrivers(data || []); })(); }, []);
 
   const filtered = buses.filter(b => (b.license_plate || '').toLowerCase().includes(search.toLowerCase()));
@@ -41,6 +43,8 @@ export default function FleetTab() {
       roadworthiness_certificate_no: b.roadworthiness_certificate_no || '',
       roadworthiness_issued_at: (b.roadworthiness_issued_at || '').toString().slice(0,16),
       roadworthiness_expires_at: (b.roadworthiness_expires_at || '').toString().slice(0,16),
+      health_status: b.health_status || '',
+      status_notes: b.status_notes || '',
     });
     setActionsOpen(true);
   };
@@ -55,6 +59,9 @@ export default function FleetTab() {
       roadworthiness_certificate_no: actionsForm.roadworthiness_certificate_no || null,
       roadworthiness_issued_at: actionsForm.roadworthiness_issued_at ? new Date(actionsForm.roadworthiness_issued_at).toISOString() : null,
       roadworthiness_expires_at: actionsForm.roadworthiness_expires_at ? new Date(actionsForm.roadworthiness_expires_at).toISOString() : null,
+      health_status: actionsForm.health_status || null,
+      status_notes: actionsForm.status_notes || null,
+      status_checked_at: new Date().toISOString(),
     };
     await updateBus(editing.bus_id, payload);
     setActionsOpen(false);
@@ -85,7 +92,7 @@ export default function FleetTab() {
   return (
     <>
       <TextField label="Search Buses" value={search} onChange={e => setSearch(e.target.value)} sx={{ mb: 2 }} />
-      <Button variant="contained" color="primary" sx={{ mb: 2 }} onClick={openNew}>Add Bus</Button>
+      {canEdit && <Button variant="contained" color="primary" sx={{ mb: 2 }} onClick={openNew}>Add Bus</Button>}
       <Table>
         <TableHead>
           <TableRow>
@@ -95,6 +102,8 @@ export default function FleetTab() {
             <TableCell>License Plate</TableCell>
             <TableCell>Capacity</TableCell>
             <TableCell>Status</TableCell>
+            <TableCell>Health</TableCell>
+            <TableCell>Last Check</TableCell>
             <TableCell>Config</TableCell>
             <TableCell>Insurance</TableCell>
             <TableCell>Insured</TableCell>
@@ -111,14 +120,16 @@ export default function FleetTab() {
               <TableCell>{b.license_plate}</TableCell>
               <TableCell>{b.capacity}</TableCell>
               <TableCell>{b.status}</TableCell>
+              <TableCell>{b.health_status || '-'}</TableCell>
+              <TableCell>{b.status_checked_at ? new Date(b.status_checked_at).toLocaleString() : '-'}</TableCell>
               <TableCell>{b.config || '-'}</TableCell>
               <TableCell>{b.insurance || '-'}</TableCell>
               <TableCell>{b.insured ? 'Yes' : 'No'}</TableCell>
               <TableCell>{b.permit_number || '-'}</TableCell>
               <TableCell>
-                <Button size="small" variant="outlined" onClick={() => openActions(b)}>Actions</Button>
-                <IconButton onClick={() => openEdit(b)}><EditIcon /></IconButton>
-                <IconButton onClick={async () => { await deleteBus(b.bus_id); load(); }}><DeleteIcon /></IconButton>
+                {canEdit && <Button size="small" variant="outlined" onClick={() => openActions(b)}>Actions</Button>}
+                {canEdit && <IconButton onClick={() => openEdit(b)}><EditIcon /></IconButton>}
+                {canEdit && <IconButton onClick={async () => { await deleteBus(b.bus_id); load(); }}><DeleteIcon /></IconButton>}
               </TableCell>
             </TableRow>
           ))}
@@ -168,7 +179,7 @@ export default function FleetTab() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={save}>Save</Button>
+          {canEdit && <Button variant="contained" onClick={save}>Save</Button>}
         </DialogActions>
       </Dialog>
 
@@ -189,6 +200,16 @@ export default function FleetTab() {
             <Divider>Operational Details</Divider>
             {/* Assigned routes skipped (no JSON denorm) */}
 
+            <Divider>Health & Status</Divider>
+            <Select fullWidth value={actionsForm.health_status} onChange={e => setActionsForm(f => ({ ...f, health_status: e.target.value }))} displayEmpty>
+              <MenuItem value="">Health (optional)</MenuItem>
+              <MenuItem value="FIT">FIT</MenuItem>
+              <MenuItem value="OK">OK</MenuItem>
+              <MenuItem value="UNWELL">UNWELL</MenuItem>
+            </Select>
+            <TextField label="Status notes" value={actionsForm.status_notes} onChange={e => setActionsForm(f => ({ ...f, status_notes: e.target.value }))} fullWidth />
+            <TextField label="Last check" value={editing?.status_checked_at ? new Date(editing.status_checked_at).toLocaleString() : ''} fullWidth disabled />
+
             <Divider>Ownership & Compliance</Divider>
             <TextField label="Owner/company name" value={actionsForm.ownership_company} onChange={e => setActionsForm(f => ({ ...f, ownership_company: e.target.value }))} fullWidth />
             <TextField label="Insurance details" value={actionsForm.insurance_details} onChange={e => setActionsForm(f => ({ ...f, insurance_details: e.target.value }))} fullWidth />
@@ -207,13 +228,13 @@ export default function FleetTab() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setActionsOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={async () => {
+          <Button onClick={() => setActionsOpen(false)}>Close</Button>
+          {canEdit && <Button variant="contained" onClick={async () => {
             await saveActions();
             if (assign.driver_id) {
               await window.supabase.from('drivers').update({ assigned_bus_id: editing.bus_id, license_number: assign.driver_license || null }).eq('driver_id', assign.driver_id);
             }
-          }}>Save</Button>
+          }}>Save</Button>}
         </DialogActions>
       </Dialog>
     </>

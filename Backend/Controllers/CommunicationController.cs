@@ -2,15 +2,18 @@ using Microsoft.AspNetCore.Mvc;
 using Backend.Models;
 using Backend.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Backend.Controllers {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "CompanyScoped")]
     public class CommunicationController : ControllerBase {
         private readonly AppDbContext _db;
         public CommunicationController(AppDbContext db) { _db = db; }
 
         // GET: api/communication
+        [Authorize(Roles = "admin,developer,ops_manager,hr_manager")]
         [HttpGet]
         public async Task<IActionResult> GetMessages([FromQuery] int? companyId = null, [FromQuery] string? userId = null, [FromQuery] string? type = null) {
             var cid = companyId;
@@ -43,6 +46,7 @@ namespace Backend.Controllers {
         }
 
         // POST: api/communication
+        [Authorize(Roles = "admin,developer,ops_manager,hr_manager")]
         [HttpPost]
         public async Task<IActionResult> SendMessage([FromBody] Message message) {
             if (message == null) return BadRequest("Message data is required");
@@ -63,6 +67,7 @@ namespace Backend.Controllers {
         }
 
         // PUT: api/communication/{id}/read
+        [Authorize(Roles = "admin,developer,ops_manager,hr_manager")]
         [HttpPut("{id}/read")]
         public async Task<IActionResult> MarkAsRead(int id) {
             var message = await _db.Messages.FindAsync(id);
@@ -76,6 +81,7 @@ namespace Backend.Controllers {
         }
 
         // GET: api/communication/announcements
+        [Authorize(Roles = "admin,developer,ops_manager,hr_manager")]
         [HttpGet("announcements")]
         public async Task<IActionResult> GetAnnouncements([FromQuery] int? companyId = null) {
             var cid = companyId;
@@ -99,6 +105,7 @@ namespace Backend.Controllers {
         }
 
         // POST: api/communication/announcements
+        [Authorize(Roles = "admin,developer,ops_manager,hr_manager")]
         [HttpPost("announcements")]
         public async Task<IActionResult> CreateAnnouncement([FromBody] Announcement announcement) {
             if (announcement == null) return BadRequest("Announcement data is required");

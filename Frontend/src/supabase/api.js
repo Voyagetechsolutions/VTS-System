@@ -4,6 +4,79 @@ function getCompanyId(companyId) {
   return companyId || window.companyId || null;
 }
 
+// Route schedules CRUD (table: route_schedules)
+export async function getRouteSchedulesTable(companyId) {
+  const cid = getCompanyId(companyId);
+  try {
+    const { data, error } = await supabase
+      .from('route_schedules')
+      .select('*')
+      .eq('company_id', cid)
+      .order('departure_time', { ascending: true })
+      .limit(1000);
+    if (error) throw error;
+    return { data };
+  } catch (e) {
+    return { data: [], error: e };
+  }
+}
+export async function upsertRouteScheduleTable(payload, companyId) {
+  const cid = getCompanyId(companyId);
+  try {
+    const row = { ...payload, company_id: payload.company_id || cid };
+    const { data, error } = await supabase
+      .from('route_schedules')
+      .upsert(row, { onConflict: 'schedule_id' })
+      .select();
+    if (error) throw error;
+    return { data };
+  } catch (e) {
+    return { data: null, error: e };
+  }
+}
+export async function deleteRouteScheduleById(scheduleId, companyId) {
+  const cid = getCompanyId(companyId);
+  try {
+    const { error } = await supabase
+      .from('route_schedules')
+      .delete()
+      .eq('schedule_id', scheduleId)
+      .eq('company_id', cid);
+    if (error) throw error;
+    return { data: true };
+  } catch (e) {
+    return { data: false, error: e };
+  }
+}
+
+// Probe DB readiness for optional modules (returns booleans per resource)
+export async function getDatabaseReadiness(companyId) {
+  const cid = getCompanyId(companyId);
+  const probe = async (name) => {
+    try {
+      const { error } = await supabase.from(name).select('*', { count: 'exact', head: true }).eq('company_id', cid);
+      if (error && (error.code === 'PGRST102' || error.message?.toLowerCase?.().includes('relation') )) return false; // missing relation
+      return true;
+    } catch { return false; }
+  };
+  const [opsDepot, opsMaint, opsFin, opsHR, opsAlerts, chan, shifts, sched] = await Promise.all([
+    probe('ops_depot_kpis'),
+    probe('ops_maintenance_kpis'),
+    probe('ops_finance_kpis'),
+    probe('ops_hr_kpis'),
+    probe('ops_alerts_kpis'),
+    probe('channel_status'),
+    probe('driver_shifts'),
+    probe('route_schedules'),
+  ]);
+  return {
+    data: {
+      views: { ops_depot_kpis: opsDepot, ops_maintenance_kpis: opsMaint, ops_finance_kpis: opsFin, ops_hr_kpis: opsHR, ops_alerts_kpis: opsAlerts },
+      tables: { channel_status: chan, driver_shifts: shifts, route_schedules: sched },
+    }
+  };
+}
+
 function getBranchId() {
   try {
     return window.userBranchId || Number(localStorage.getItem('branchId')) || null;
@@ -50,6 +123,32 @@ export async function updateCompanySettings(update, companyId) {
   // upsert to ensure row exists
   return supabase.from('company_settings').upsert(payload, { onConflict: 'company_id' });
 }
+
+// Company subscription helpers (used in SettingsTab)
+export async function getCompanySubscription(companyId) {
+  const cid = getCompanyId(companyId);
+  if (!cid) return { data: null };
+  // Simple model: one row in subscriptions per company
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .select('id, plan, amount, status, created_at')
+    .eq('company_id', cid)
+    .limit(1)
+    .maybeSingle();
+  return { data, error };
+}
+
+export async function updateSubscriptionPlan(subscriptionId, plan) {
+  if (!subscriptionId) return { error: 'Missing subscription id' };
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .update({ plan })
+    .eq('id', subscriptionId)
+    .select('id, plan, amount, status')
+    .maybeSingle();
+  return { data, error };
+}
+
 // Company Admin Dashboard APIs
 export async function getCompanyKPIs(companyId) {
   const cid = getCompanyId(companyId);
@@ -658,6 +757,161 @@ export async function getCompanyUsers(companyId) {
   const cid = getCompanyId(companyId);
   return supabase.from('users').select('*').eq('company_id', cid);
 }
+
+// Command Center KPIs: Open Incidents (count unresolved)
+export async function getOpenIncidentsCount(companyId) {
+  const cid = getCompanyId(companyId);
+  try {
+    const { count, error } = await supabase
+      .from('incidents')
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', cid)
+      .neq('status', 'resolved');
+    if (error) throw error;
+    return { data: Number(count || 0) };
+  } catch (e) {
+    return { data: 0, error: e };
+  }
+}
+
+// Communications channel health (optional table/view: channel_status)
+// Expected shape: [{ service: 'email'|'sms'|'push'|'in_app', status: 'active'|'down'|'degraded', message, updated_at }]
+export async function getChannelStatus(companyId) {
+  const cid = getCompanyId(companyId);
+  try {
+    const { data, error } = await supabase
+      .from('channel_status')
+      .select('service, status, message, updated_at')
+      .eq('company_id', cid);
+    if (error) throw error;
+    const rows = Array.isArray(data) ? data : [];
+    const map = Object.fromEntries(rows.map(r => [r.service, r]));
+    return { data: map };
+  } catch (e) {
+    // Fallback: assume active
+    return { data: { email: { status: 'active' }, sms: { status: 'active' }, push: { status: 'active' }, in_app: { status: 'active' } }, error: e };
+  }
+}
+
+// Ops KPI views helpers
+export async function getOpsBookingOfficeKPIs(companyId) {
+  const cid = getCompanyId(companyId);
+  const { data, error } = await supabase.from('ops_booking_office_kpis').select('*').eq('company_id', cid).order('day', { ascending: false }).limit(1);
+  return { data: data?.[0] || null, error };
+}
+export async function getOpsBoardingKPIs(companyId) {
+  const cid = getCompanyId(companyId);
+  const { data, error } = await supabase.from('ops_boarding_kpis').select('*').eq('company_id', cid).order('day', { ascending: false }).limit(1);
+  return { data: data?.[0] || null, error };
+}
+export async function getOpsDriverKPIs(companyId) {
+  const cid = getCompanyId(companyId);
+  const { data, error } = await supabase.from('ops_driver_kpis').select('*').eq('company_id', cid).order('day', { ascending: false }).limit(1);
+  return { data: data?.[0] || null, error };
+}
+export async function getOpsOperationsKPIs(companyId) {
+  const cid = getCompanyId(companyId);
+  const { data, error } = await supabase.from('ops_operations_kpis').select('*').eq('company_id', cid).order('day', { ascending: false }).limit(1);
+  return { data: data?.[0] || null, error };
+}
+
+export async function getOpsDepotKPIs(companyId) {
+  const cid = getCompanyId(companyId);
+  const { data, error } = await supabase.from('ops_depot_kpis').select('*').eq('company_id', cid).order('day', { ascending: false }).limit(1);
+  return { data: data?.[0] || null, error };
+}
+export async function getOpsMaintenanceKPIs(companyId) {
+  const cid = getCompanyId(companyId);
+  const { data, error } = await supabase.from('ops_maintenance_kpis').select('*').eq('company_id', cid).order('day', { ascending: false }).limit(1);
+  return { data: data?.[0] || null, error };
+}
+export async function getOpsFinanceKPIs(companyId) {
+  const cid = getCompanyId(companyId);
+  const { data, error } = await supabase.from('ops_finance_kpis').select('*').eq('company_id', cid).order('day', { ascending: false }).limit(1);
+  return { data: data?.[0] || null, error };
+}
+export async function getOpsHRKPIs(companyId) {
+  const cid = getCompanyId(companyId);
+  const { data, error } = await supabase.from('ops_hr_kpis').select('*').eq('company_id', cid).order('day', { ascending: false }).limit(1);
+  return { data: data?.[0] || null, error };
+}
+export async function getOpsAlertsKPIs(companyId) {
+  const cid = getCompanyId(companyId);
+  const { data, error } = await supabase.from('ops_alerts_kpis').select('*').eq('company_id', cid).order('day', { ascending: false }).limit(1);
+  return { data: data?.[0] || null, error };
+}
+
+// Combined snapshot using ops views (fallback to existing RPC-based snapshot if needed)
+export async function getOpsSnapshotFromViews(companyId) {
+  const cid = getCompanyId(companyId);
+  try {
+    const [booking, boarding, driver, ops, depot, maint, fin, hr, alerts] = await Promise.all([
+      getOpsBookingOfficeKPIs(cid),
+      getOpsBoardingKPIs(cid),
+      getOpsDriverKPIs(cid),
+      getOpsOperationsKPIs(cid),
+      getOpsDepotKPIs(cid),
+      getOpsMaintenanceKPIs(cid),
+      getOpsFinanceKPIs(cid),
+      getOpsHRKPIs(cid),
+      getOpsAlertsKPIs(cid)
+    ]);
+    const snap = {
+      booking: {
+        volumeToday: Number(booking.data?.bookings_today || 0),
+        largeRefundsPending: Number(booking.data?.refunds_pending_today || 0),
+        reconciliationStatus: booking.data?.reconciliation_status || 'OK',
+        fraudAlerts: Number(booking.data?.potentially_fraud || 0),
+        blacklistOverrides: Number(booking.data?.blacklist_overrides || 0),
+      },
+      boarding: {
+        seatUtilizationPct: Number(boarding.data?.seat_utilization_pct || 0),
+        incidentsToday: Number(boarding.data?.incidents || 0),
+        delays: Number(boarding.data?.delays || 0),
+      },
+      driver: {
+        completionRate: Number(driver.data?.completion_pct || 0),
+        accidents: Number(driver.data?.accidents || 0),
+        onTimeScore: Number(driver.data?.on_time_score || 0),
+        expiredCerts: Number(driver.data?.expired_certs || 0),
+      },
+      ops: {
+        utilizationPct: Number(ops.data?.utilization_pct || 0),
+        deadMileageKm: Number(ops.data?.dead_mileage_km || 0),
+        routeApprovals: Number(ops.data?.approvals_pending || 0),
+      },
+      depot: {
+        readinessPct: Number(depot.data?.readiness_pct || 0),
+        staffShortages: Number(depot.data?.staff_shortages || 0),
+        busesDown: Number(depot.data?.buses_down || 0),
+      },
+      maintenance: {
+        downtimePct: Number(maint.data?.downtime_pct || 0),
+        majorApprovals: Number(maint.data?.major_approvals || 0),
+        monthCost: Number(maint.data?.month_cost || 0),
+      },
+      finance: {
+        pnlMonth: Number(fin.data?.pnl_month || 0),
+        highRiskRefunds: Number(fin.data?.high_risk_refunds || 0),
+        largeExpensesPending: Number(fin.data?.large_expenses_pending || 0),
+      },
+      hr: {
+        turnoverRate: Number(hr.data?.turnover_rate || 0),
+        criticalHires: Number(hr.data?.critical_hires || 0),
+        payrollAdjustments: Number(hr.data?.payroll_adjustments || 0),
+      },
+      alerts: {
+        escalationsToday: Number(alerts.data?.escalations_today || 0),
+        broadcasts: Number(alerts.data?.broadcasts || 0),
+        rules: Number(alerts.data?.rules || 0),
+      },
+    };
+    return { data: snap };
+  } catch (e) {
+    // Fallback
+    return getAdminOversightSnapshot(cid);
+  }
+}
 export async function createUser(data) {
   // Always create via Edge Function so Auth + profile are in sync. No DB-only fallback.
   const payload = { ...data };
@@ -731,6 +985,15 @@ export async function getCompanyBuses(companyId) {
   const cid = getCompanyId(companyId);
   return supabase.from('buses').select('*').eq('company_id', cid);
 }
+// Lightweight list of all buses for selectors (bus_id + license)
+export async function getAllBusesGlobal(companyId) {
+  const cid = getCompanyId(companyId);
+  return supabase
+    .from('buses')
+    .select('bus_id, license_plate, status, health_status, status_checked_at')
+    .eq('company_id', cid)
+    .order('license_plate');
+}
 // Maintenance: costs & outsourcing & workshop & sustainability
 export async function completeMaintenanceTaskWithCost(taskId, { laborHours = 0, laborRate = 0, partsCost = 0 }) {
   const total = (Number(laborHours) || 0) * (Number(laborRate) || 0) + (Number(partsCost) || 0);
@@ -797,14 +1060,24 @@ export async function listDriverEarnings() {
   } catch (e) { return { data: [] }; }
 }
 
-// Branch management
 export async function getBranches(companyId) {
   const cid = getCompanyId(companyId);
   return supabase.from('branches').select('branch_id, name, location').eq('company_id', cid).order('name');
 }
 export async function createBranch(name, location, companyId) {
   const cid = getCompanyId(companyId);
-  return supabase.from('branches').insert([{ company_id: cid, name, location }]);
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
+  const resp = await fetch(`${API_BASE_URL}/branches`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ companyId: cid, name, location })
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    return { error: text || `HTTP ${resp.status}` };
+  }
+  const data = await resp.json();
+  return { data };
 }
 export async function setUserBranch(user_id, branch_id) {
   // Persist branch assignment on profile
@@ -814,34 +1087,40 @@ export async function setUserBranch(user_id, branch_id) {
   }
   return { error };
 }
-export async function createBus(data) {
+export async function createRoute(data) {
   const payload = { ...data };
   if (!payload.company_id) payload.company_id = getCompanyId();
-  // Try insert with full payload first
-  const { data: insData, error } = await supabase.from('buses').insert([payload]);
-  if (error && String(error.message || '').toLowerCase().includes('model')) {
-    // Retry without model to tolerate schema cache / missing column
-    const { model, ...fallback } = payload;
-    return supabase.from('buses').insert([fallback]);
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
+  const body = {
+    companyId: payload.company_id,
+    RouteName: payload.route_name || payload.route_code || payload.routeName || null,
+    Origin: payload.origin || null,
+    Destination: payload.destination || null,
+    Price: payload.price != null ? Number(payload.price) : null,
+    Currency: payload.currency || null,
+  };
+  const resp = await fetch(`${API_BASE_URL}/routes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    return { error: text || `HTTP ${resp.status}` };
   }
-  return { data: insData, error };
+  const inserted = await resp.json();
+  return { data: inserted };
 }
-export async function updateBus(id, data) {
-  const { data: updData, error } = await supabase.from('buses').update(data).eq('bus_id', id);
-  if (error && String(error.message || '').toLowerCase().includes('model')) {
-    const { model, ...fallback } = data || {};
-    return supabase.from('buses').update(fallback).eq('bus_id', id);
-  }
-  return { data: updData, error };
+export async function updateRoute(id, data) {
+  return supabase.from('routes').update(data).eq('route_id', id);
 }
-export async function deleteBus(id) {
-  return supabase.from('buses').delete().eq('bus_id', id);
+export async function deleteRoute(id) {
+  return supabase.from('routes').delete().eq('route_id', id);
 }
 export async function getCompanyRoutes(companyId) {
   const cid = getCompanyId(companyId);
   return supabase.from('routes').select('*').eq('company_id', cid);
 }
-
 // Booking office helpers
 export async function searchBookings(query) {
   const q = (query || '').trim().toLowerCase();
@@ -894,7 +1173,6 @@ export async function cancelBooking(booking_id, reason) {
   try { await supabase.from('activity_log').insert([{ company_id: window.companyId, type: 'booking_cancel', message: JSON.stringify({ booking_id, reason }) }]); } catch {}
   return { data, error };
 }
-
 // Support tickets (dedicated table)
 export async function createSupportTicket(title, message, priority) {
   const payload = {
@@ -923,18 +1201,6 @@ export async function resolveSupportTicket(id) {
 export async function assignSupportTicket(id, user_id) {
   return supabase.from('support_tickets').update({ assigned_to: user_id || window.userId || null }).eq('id', id);
 }
-export async function createRoute(data) {
-  const payload = { ...data };
-  if (!payload.company_id) payload.company_id = getCompanyId();
-  return supabase.from('routes').insert([payload]);
-}
-export async function updateRoute(id, data) {
-  return supabase.from('routes').update(data).eq('route_id', id);
-}
-export async function deleteRoute(id) {
-  return supabase.from('routes').delete().eq('route_id', id);
-}
-
 // Route stops & schedules
 export async function getRouteStopsTable(route_id) {
   return supabase.from('route_stops').select('id, sort_order, name, city_id, eta, etd').eq('route_id', route_id).order('sort_order');
@@ -1071,6 +1337,40 @@ export async function getFleetStatus(companyId) {
   const { data, error } = await supabase.from('buses').select('*').eq('company_id', cid).order('license_plate');
   if (error) return { data: [], error };
   return { data };
+}
+export async function createBus(bus) {
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
+  const payload = { ...bus };
+  if (!payload.company_id) payload.company_id = getCompanyId();
+  const resp = await fetch(`${API_BASE_URL}/data/buses`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!resp.ok) return { error: await resp.text() };
+  const data = await resp.json();
+  return { data };
+}
+export async function updateBus(bus_id, updates) {
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
+  const resp = await fetch(`${API_BASE_URL}/data/buses/update?idColumn=bus_id&idValue=${encodeURIComponent(bus_id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates || {})
+  });
+  if (!resp.ok) return { error: await resp.text() };
+  const data = await resp.json();
+  return { data };
+}
+export async function deleteBus(bus_id) {
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
+  const resp = await fetch(`${API_BASE_URL}/data/buses/delete?idColumn=bus_id&idValue=${encodeURIComponent(bus_id)}`, {
+    method: 'DELETE'
+  });
+  if (!resp.ok) return { error: await resp.text() };
+  const text = await resp.text();
+  // PostgREST may return empty body on delete; standardize shape
+  return { data: text ? JSON.parse(text) : null };
 }
 export async function markBusDelayed(busId) {
   return supabase.from('buses').update({ status: 'Under Maintenance' }).eq('bus_id', busId);
@@ -1420,9 +1720,6 @@ export async function deactivateUserGlobal(user_id) {
 }
 
 // Developer: Fleet & Routes
-export async function getAllBusesGlobal() {
-  return supabase.from('buses').select('bus_id, license_plate, capacity, status, company_id');
-}
 export async function getAllRoutesGlobal() {
   return supabase.from('routes').select('route_id, origin, destination, country, frequency, company_id');
 }
@@ -1462,11 +1759,16 @@ export async function listMaintenanceLogs() {
 export async function upsertMaintenanceLog(row) {
   return supabase.from('maintenance_logs').upsert([{ ...row, company_id: getCompanyId() }], { onConflict: 'id' });
 }
-export async function listFuelLogs() {
-  return supabase.from('fuel_logs').select('*').eq('company_id', getCompanyId()).order('created_at', { ascending: false });
-}
 export async function upsertFuelLog(row) {
   return supabase.from('fuel_logs').upsert([{ ...row, company_id: getCompanyId() }], { onConflict: 'id' });
+}
+export async function listFuelLogs(companyId) {
+  const cid = getCompanyId(companyId);
+  return supabase
+    .from('fuel_logs')
+    .select('id, bus_id, date, liters, cost, station, receipt_url')
+    .eq('company_id', cid)
+    .order('date', { ascending: false });
 }
 export async function listTripSchedules() {
   return supabase.from('route_schedules').select('*');
@@ -2498,24 +2800,6 @@ export async function getSubscriptions() {
   return supabase
     .from('subscriptions')
     .select('id, company_id, plan, status, current_period_end');
-}
-export async function getCompanySubscription(companyId) {
-  const cid = getCompanyId(companyId);
-  if (!cid) return { data: null };
-  const { data, error } = await supabase
-    .from('subscriptions')
-    .select('id, plan, status, current_period_end')
-    .eq('company_id', cid)
-    .limit(1)
-    .maybeSingle();
-  return { data, error };
-}
-
-export async function updateSubscriptionPlan(id, plan) {
-  return supabase
-    .from('subscriptions')
-    .update({ plan })
-    .eq('id', id);
 }
 
 export async function getInvoices() {

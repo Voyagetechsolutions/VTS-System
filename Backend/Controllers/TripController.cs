@@ -2,14 +2,17 @@ using Microsoft.AspNetCore.Mvc;
 using Backend.Models;
 using Backend.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Backend.Controllers {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "CompanyScoped")]
     public class TripController : ControllerBase {
         private readonly AppDbContext _db;
         public TripController(AppDbContext db) { _db = db; }
         // GET: api/trip
+        [Authorize(Roles = "admin,developer,ops_manager,boarding_operator")]
         [HttpGet]
         public async Task<IActionResult> GetTrips([FromQuery] int? companyId = null) {
             var cid = companyId;
@@ -25,6 +28,7 @@ namespace Backend.Controllers {
             return Ok(items);
         }
         // POST: api/trip
+        [Authorize(Roles = "admin,developer,ops_manager")]
         [HttpPost]
         public async Task<IActionResult> CreateTrip([FromBody] Trip trip) {
             if (trip == null) return BadRequest();

@@ -18,6 +18,7 @@ import {
   getLargeRefunds, getRouteRequests, getMaintenanceRequests, 
   getHRRequests 
 } from '../../../supabase/api';
+import { getCompanySettings } from '../../../supabase/api';
 
 // Company Admin Approvals Dashboard - Meta Control Panel
 export default function ApprovalsTab() {
@@ -29,9 +30,18 @@ export default function ApprovalsTab() {
   const [selectedApproval, setSelectedApproval] = useState(null);
   const [approvalDialog, setApprovalDialog] = useState(false);
   const [approvalNotes, setApprovalNotes] = useState('');
+  const [canApprove, setCanApprove] = useState(true);
 
   useEffect(() => {
     loadApprovalData();
+    (async () => {
+      try {
+        const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole') || 'admin';
+        const { data } = await getCompanySettings();
+        const approveFlag = !!(data?.rbac?.[role]?.approve);
+        setCanApprove(approveFlag);
+      } catch { setCanApprove(true); }
+    })();
     const interval = setInterval(loadApprovalData, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
   }, []);
@@ -150,13 +160,15 @@ export default function ApprovalsTab() {
                         primary={`${formatCurrency(refund.amount)} - ${refund.passenger_name}`}
                         secondary={`Booking: ${refund.booking_id} • ${refund.reason}`}
                       />
-                      <Button 
-                        size="small" 
-                        variant="outlined" 
-                        onClick={() => openApprovalDialog({...refund, type: 'refund'})}
-                      >
-                        Review
-                      </Button>
+                      {canApprove && (
+                        <Button 
+                          size="small" 
+                          variant="outlined" 
+                          onClick={() => openApprovalDialog({...refund, type: 'refund'})}
+                        >
+                          Review
+                        </Button>
+                      )}
                     </ListItem>
                   ))}
                 </List>
@@ -186,13 +198,15 @@ export default function ApprovalsTab() {
                         primary={request.route_name}
                         secondary={`${request.action} • ${request.requested_by}`}
                       />
-                      <Button 
-                        size="small" 
-                        variant="outlined" 
-                        onClick={() => openApprovalDialog({...request, type: 'route'})}
-                      >
-                        Review
-                      </Button>
+                      {canApprove && (
+                        <Button 
+                          size="small" 
+                          variant="outlined" 
+                          onClick={() => openApprovalDialog({...request, type: 'route'})}
+                        >
+                          Review
+                        </Button>
+                      )}
                     </ListItem>
                   ))}
                 </List>
@@ -222,13 +236,15 @@ export default function ApprovalsTab() {
                         primary={`Bus ${request.bus_number} - ${request.work_type}`}
                         secondary={`${formatCurrency(request.estimated_cost)} • ${request.priority}`}
                       />
-                      <Button 
-                        size="small" 
-                        variant="outlined" 
-                        onClick={() => openApprovalDialog({...request, type: 'maintenance'})}
-                      >
-                        Review
-                      </Button>
+                      {canApprove && (
+                        <Button 
+                          size="small" 
+                          variant="outlined" 
+                          onClick={() => openApprovalDialog({...request, type: 'maintenance'})}
+                        >
+                          Review
+                        </Button>
+                      )}
                     </ListItem>
                   ))}
                 </List>
@@ -258,13 +274,15 @@ export default function ApprovalsTab() {
                         primary={`${request.action} - ${request.employee_name}`}
                         secondary={`${request.department} • ${request.requested_by}`}
                       />
-                      <Button 
-                        size="small" 
-                        variant="outlined" 
-                        onClick={() => openApprovalDialog({...request, type: 'hr'})}
-                      >
-                        Review
-                      </Button>
+                      {canApprove && (
+                        <Button 
+                          size="small" 
+                          variant="outlined" 
+                          onClick={() => openApprovalDialog({...request, type: 'hr'})}
+                        >
+                          Review
+                        </Button>
+                      )}
                     </ListItem>
                   ))}
                 </List>
@@ -300,13 +318,15 @@ export default function ApprovalsTab() {
                         size="small"
                         sx={{ mr: 1 }}
                       />
-                      <Button 
-                        size="small" 
-                        variant="outlined" 
-                        onClick={() => openApprovalDialog(approval)}
-                      >
-                        Review
-                      </Button>
+                      {canApprove && (
+                        <Button 
+                          size="small" 
+                          variant="outlined" 
+                          onClick={() => openApprovalDialog(approval)}
+                        >
+                          Review
+                        </Button>
+                      )}
                     </ListItem>
                   ))}
                 </List>
@@ -368,23 +388,27 @@ export default function ApprovalsTab() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setApprovalDialog(false)}>Cancel</Button>
-          <Button 
-            variant="outlined" 
-            color="error" 
-            startIcon={<CancelIcon />}
-            onClick={() => handleApproval(selectedApproval?.approval_id, 'reject', approvalNotes)}
-          >
-            Reject
-          </Button>
-          <Button 
-            variant="contained" 
-            color="success" 
-            startIcon={<CheckCircleIcon />}
-            onClick={() => handleApproval(selectedApproval?.approval_id, 'approve', approvalNotes)}
-          >
-            Approve
-          </Button>
+          <Button onClick={() => setApprovalDialog(false)}>Close</Button>
+          {canApprove && (
+            <>
+              <Button 
+                variant="outlined" 
+                color="error" 
+                startIcon={<CancelIcon />}
+                onClick={() => handleApproval(selectedApproval?.approval_id, 'reject', approvalNotes)}
+              >
+                Reject
+              </Button>
+              <Button 
+                variant="contained" 
+                color="success" 
+                startIcon={<CheckCircleIcon />}
+                onClick={() => handleApproval(selectedApproval?.approval_id, 'approve', approvalNotes)}
+              >
+                Approve
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
     </Box>

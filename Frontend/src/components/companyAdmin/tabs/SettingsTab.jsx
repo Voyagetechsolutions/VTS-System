@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { Box, Paper, Typography, Button, TextField, Stack, Alert, Grid, Select, MenuItem } from '@mui/material';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Box, Paper, Typography, Button, TextField, Stack, Alert, Grid, Select, MenuItem, FormGroup, FormControlLabel, Checkbox } from '@mui/material';
 import { getCompanyBasic, getCompanySettings, updateCompanySettings, getCompanySubscription, updateSubscriptionPlan } from '../../../supabase/api';
 
 export default function SettingsTab() {
   const [company, setCompany] = useState(null);
-  const [settings, setSettings] = useState({ address: '', contact: '', logo_url: '', currency: 'USD', timezone: 'UTC', language: 'en', date_format: 'YYYY-MM-DD', units: 'metric', bus_capacity_default: 60, seat_layout: '2x2', vehicle_categories: 'mini,midi,coach', refund_policy: '', booking_limit: 5, commission_rate: 0, tax_vat: 0, bank_details: '', email_templates: '', sms_templates: '', gps_api_key: '' });
+  const [settings, setSettings] = useState({ address: '', contact: '', logo_url: '', currency: 'USD', timezone: 'UTC', language: 'en', date_format: 'YYYY-MM-DD', units: 'metric', bus_capacity_default: 60, seat_layout: '2x2', vehicle_categories: 'mini,midi,coach', refund_policy: '', booking_limit: 5, commission_rate: 0, tax_vat: 0, bank_details: '', email_templates: '', sms_templates: '', gps_api_key: '', rbac: {}, modules_visibility: {} });
   const [subscription, setSubscription] = useState(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -35,7 +35,9 @@ export default function SettingsTab() {
       bank_details: s?.bank_details || '',
       email_templates: s?.email_templates || '',
       sms_templates: s?.sms_templates || '',
-      gps_api_key: s?.gps_api_key || ''
+      gps_api_key: s?.gps_api_key || '',
+      rbac: s?.rbac || {},
+      modules_visibility: s?.modules_visibility || {}
     });
     setSubscription(sub || null);
   };
@@ -60,6 +62,33 @@ export default function SettingsTab() {
     const { error } = await updateSubscriptionPlan(subscription.id, 'Pro');
     setMsg(error ? 'Downgrade failed' : 'Downgraded');
     load();
+  };
+
+  // RBAC & Module visibility helpers
+  const roles = useMemo(() => ['admin','ops_manager','booking_officer','boarding_operator','driver','depot_manager','maintenance_manager','finance_manager','hr_manager'], []);
+  const modules = useMemo(() => [
+    'Executive Overview','Approvals & Oversight','Global Communications','Oversight Map','Live Map Buses',
+    'User Management','Driver Hub','Customer Hub','HR: Profiles','HR: Attendance','HR: Payroll','HR: Training',
+    'Fleet Management','Routes & Scheduling','Branches','Bookings & Ticketing','Reports & Analytics','Audit Trail',
+    'Maintenance','Fuel Tracking','Trip Scheduling','Depot: Ops Supervisor','Depot: Dispatch','Depot: Staff & Shifts',
+    'Inventory & Warehouse','Finance Center','Notifications & Alerts','Trip Info','Compliance & Safety','Documents','Communications','System Settings','Profile'
+  ], []);
+  const defaultPerms = { view: true, edit: false, approve: false, finance: false, hr: false };
+  const [rbacRole, setRbacRole] = useState('admin');
+
+  const rolePerms = (settings.rbac && settings.rbac[rbacRole]) || defaultPerms;
+  const roleModules = (settings.modules_visibility && settings.modules_visibility[rbacRole]) || [];
+
+  const togglePerm = (key) => {
+    setSettings(s => ({
+      ...s,
+      rbac: { ...s.rbac, [rbacRole]: { ...(s.rbac?.[rbacRole] || defaultPerms), [key]: !(s.rbac?.[rbacRole]?.[key] ?? defaultPerms[key]) } }
+    }));
+  };
+  const toggleModule = (mod) => {
+    const has = roleModules.includes(mod);
+    const next = has ? roleModules.filter(m => m !== mod) : roleModules.concat([mod]);
+    setSettings(s => ({ ...s, modules_visibility: { ...s.modules_visibility, [rbacRole]: next } }));
   };
 
   return (
@@ -111,6 +140,35 @@ export default function SettingsTab() {
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}><TextField label="GPS/Tracking API key" value={settings.gps_api_key} onChange={e => setSettings(s => ({ ...s, gps_api_key: e.target.value }))} fullWidth /></Grid>
           </Grid>
+
+          <DividerSection title="Roles & Access Control (RBAC)" />
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={3}>
+              <Select fullWidth value={rbacRole} onChange={e => setRbacRole(e.target.value)}>
+                {roles.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
+              </Select>
+            </Grid>
+            <Grid item xs={12} md={9}>
+              <FormGroup row>
+                <FormControlLabel control={<Checkbox checked={!!rolePerms.view} onChange={() => togglePerm('view')} />} label="View" />
+                <FormControlLabel control={<Checkbox checked={!!rolePerms.edit} onChange={() => togglePerm('edit')} />} label="Edit" />
+                <FormControlLabel control={<Checkbox checked={!!rolePerms.approve} onChange={() => togglePerm('approve')} />} label="Approve" />
+                <FormControlLabel control={<Checkbox checked={!!rolePerms.finance} onChange={() => togglePerm('finance')} />} label="Finance" />
+                <FormControlLabel control={<Checkbox checked={!!rolePerms.hr} onChange={() => togglePerm('hr')} />} label="HR" />
+              </FormGroup>
+            </Grid>
+          </Grid>
+
+          <DividerSection title="Module Visibility by Role" />
+          <Typography variant="body2" color="text.secondary">Toggle which modules are visible for role: {rbacRole}</Typography>
+          <Grid container spacing={1} sx={{ maxHeight: 220, overflowY: 'auto', border: '1px solid #eee', p: 1, borderRadius: 1 }}>
+            {modules.map(m => (
+              <Grid item key={m} xs={12} sm={6} md={4}>
+                <FormControlLabel control={<Checkbox checked={roleModules.includes(m)} onChange={() => toggleModule(m)} />} label={m} />
+              </Grid>
+            ))}
+          </Grid>
+
           <Stack direction="row" spacing={2}>
             <Button variant="contained" color="success" onClick={save} disabled={saving}>Save Changes</Button>
             <Button variant="outlined" onClick={upgrade} disabled={!subscription?.id}>Upgrade Plan</Button>
