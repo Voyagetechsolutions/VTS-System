@@ -8,6 +8,29 @@
 -- This assumes you have a 'role' column in your users table
 
 -- ============================================================================
+-- DROP EXISTING POLICIES (if they exist)
+-- ============================================================================
+DROP POLICY IF EXISTS "Developers can view all activity logs" ON activity_log;
+DROP POLICY IF EXISTS "Developers can view all companies" ON companies;
+DROP POLICY IF EXISTS "Developers can update all companies" ON companies;
+DROP POLICY IF EXISTS "Developers can view all users" ON users;
+DROP POLICY IF EXISTS "Developers can update all users" ON users;
+DROP POLICY IF EXISTS "Developers can view all bookings" ON bookings;
+DROP POLICY IF EXISTS "Developers can view all buses" ON buses;
+DROP POLICY IF EXISTS "Developers can view all routes" ON routes;
+DROP POLICY IF EXISTS "Developers can view all payments" ON payments;
+DROP POLICY IF EXISTS "Developers can view all subscriptions" ON subscriptions;
+DROP POLICY IF EXISTS "Developers can update all subscriptions" ON subscriptions;
+DROP POLICY IF EXISTS "Developers can view all announcements" ON announcements;
+DROP POLICY IF EXISTS "Developers can insert announcements" ON announcements;
+DROP POLICY IF EXISTS "Developers can update all announcements" ON announcements;
+DROP POLICY IF EXISTS "Developers can delete announcements" ON announcements;
+DROP POLICY IF EXISTS "Developers can view platform settings" ON platform_settings;
+DROP POLICY IF EXISTS "Developers can update platform settings" ON platform_settings;
+DROP POLICY IF EXISTS "Developers can insert companies" ON companies;
+DROP POLICY IF EXISTS "Developers can insert users" ON users;
+
+-- ============================================================================
 -- Activity Log - Allow developers to see all logs
 -- ============================================================================
 CREATE POLICY "Developers can view all activity logs"
@@ -242,11 +265,37 @@ USING (
 );
 
 -- ============================================================================
+-- Additional INSERT Policies for Creating Data
+-- ============================================================================
+CREATE POLICY "Developers can insert companies"
+ON companies
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM users
+    WHERE users.user_id = auth.uid()
+    AND users.role = 'developer'
+  )
+);
+
+CREATE POLICY "Developers can insert users"
+ON users
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM users AS u
+    WHERE u.user_id = auth.uid()
+    AND u.role = 'developer'
+  )
+);
+
+-- ============================================================================
 -- NOTES:
 -- ============================================================================
 -- 1. These policies assume you have a 'role' column in your users table
 -- 2. The developer role should be 'developer' (lowercase)
--- 3. You may need to adjust the policy names if they conflict with existing policies
--- 4. To drop existing policies, use: DROP POLICY "policy_name" ON table_name;
--- 5. To see existing policies: SELECT * FROM pg_policies WHERE tablename = 'your_table';
+-- 3. Policies are now idempotent - safe to run multiple times
+-- 4. To see existing policies: SELECT * FROM pg_policies WHERE tablename = 'your_table';
 -- ============================================================================

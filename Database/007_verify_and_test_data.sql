@@ -76,7 +76,7 @@ UNION ALL
 SELECT 
     'announcements' AS table_name,
     COUNT(*) AS total_count,
-    COUNT(*) FILTER (WHERE status = 'sent') AS sent_count
+    NULL AS sent_count
 FROM announcements;
 
 -- ============================================================================
