@@ -115,13 +115,17 @@ export default function CompaniesDevTab() {
       color: 'info'
     },
     { 
-      label: row => row.is_active ? 'Suspend' : 'Activate', 
-      icon: row => row.is_active ? <PauseIcon /> : <PlayIcon />, 
-      onClick: async ({ row }) => { 
+      label: (row) => row?.is_active ? 'Suspend' : 'Activate', 
+      icon: <PauseIcon />, 
+      onClick: async ({ row }) => {
+        if (!row || !row.company_id) {
+          console.error('Invalid row data:', row);
+          return;
+        }
         await suspendCompany(row.company_id); 
         load(); 
       }, 
-      color: row => row.is_active ? 'error' : 'success'
+      color: (row) => row?.is_active ? 'error' : 'success'
     },
   ];
 

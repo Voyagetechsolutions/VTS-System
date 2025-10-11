@@ -993,8 +993,12 @@ export async function updateSubscription(id, updates) {
 
 // Developer: Monitoring & Logs (using activity_log)
 export async function getActivityLogGlobal({ type } = {}) {
+  // For developer dashboard, we want all logs regardless of company
+  // Remove any automatic company_id filtering
   let q = supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(500);
   if (type) q = q.eq('type', type);
+  // Note: If RLS is blocking this, you may need to create a database view or function
+  // that bypasses RLS for developer role, or temporarily disable RLS on activity_log
   return q;
 }
 
