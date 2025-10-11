@@ -119,7 +119,7 @@ SELECT COUNT(*) AS route_count FROM routes;
 -- contact_phone (text), status (text), payment_status (text), booking_date (timestamp)
 
 INSERT INTO bookings (passenger_name, contact_email, contact_phone, status, payment_status, booking_date)
-VALUES
+SELECT * FROM (VALUES
     ('Peter Smith', 'peter@email.com', '+27 82 123 4567', 'Confirmed', 'paid', NOW()),
     ('Mary Johnson', 'mary@email.com', '+27 83 234 5678', 'Confirmed', 'paid', NOW()),
     ('David Brown', 'david@email.com', '+27 84 345 6789', 'Confirmed', 'paid', NOW()),
@@ -127,7 +127,8 @@ VALUES
     ('James Davis', 'james@email.com', '+27 86 567 8901', 'Confirmed', 'paid', NOW() - INTERVAL '1 day'),
     ('Emma Taylor', 'emma@email.com', '+27 87 678 9012', 'Confirmed', 'paid', NOW() - INTERVAL '2 days'),
     ('Oliver White', 'oliver@email.com', '+27 88 789 0123', 'Pending', 'pending', NOW())
-WHERE NOT EXISTS (SELECT 1 FROM bookings WHERE contact_email IN ('peter@email.com', 'mary@email.com', 'david@email.com', 'susan@email.com', 'james@email.com', 'emma@email.com', 'oliver@email.com'));
+) AS v(passenger_name, contact_email, contact_phone, status, payment_status, booking_date)
+WHERE NOT EXISTS (SELECT 1 FROM bookings WHERE contact_email = v.contact_email);
 
 SELECT '✅ Step 5: Bookings created' AS status;
 SELECT COUNT(*) AS booking_count FROM bookings;
@@ -195,11 +196,12 @@ SELECT COUNT(*) AS activity_count FROM activity_log;
 -- Schema: id (uuid), title (text), message (text), created_at (timestamp)
 
 INSERT INTO announcements (title, message, created_at)
-VALUES
+SELECT * FROM (VALUES
     ('Welcome to VTS', 'Welcome to the VTS Bus Management System!', NOW()),
     ('System Maintenance', 'Scheduled maintenance on Sunday 2AM-4AM', NOW() - INTERVAL '1 day'),
     ('New Features', 'Check out our new booking features!', NOW() - INTERVAL '2 days')
-WHERE NOT EXISTS (SELECT 1 FROM announcements WHERE title IN ('Welcome to VTS', 'System Maintenance', 'New Features'));
+) AS v(title, message, created_at)
+WHERE NOT EXISTS (SELECT 1 FROM announcements WHERE title = v.title);
 
 SELECT '✅ Step 8: Announcements created' AS status;
 SELECT COUNT(*) AS announcement_count FROM announcements;
