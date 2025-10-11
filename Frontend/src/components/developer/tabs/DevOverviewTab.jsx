@@ -3,7 +3,7 @@ import { Box, Grid, Card, CardContent, Typography, Button, Dialog, DialogTitle, 
 import { Business as BusinessIcon, People as PeopleIcon, Announcement as AnnouncementIcon, MonetizationOn as MonetizationOnIcon, DirectionsBus as BusIcon, AttachMoney as MoneyIcon, Notifications as NotificationsIcon, AccessTime as TimeIcon } from '@mui/icons-material';
 import DashboardCard from '../../common/DashboardCard';
 import DataTable from '../../common/DataTable';
-import { getPlatformMetrics, getActivityLog, getCompaniesLight } from '../../../supabase/api';
+import { getPlatformMetrics, getActivityLogGlobal, getCompaniesLight, createCompany, createUser, createAnnouncement } from '../../../supabase/api';
 
 export default function DevOverviewTab() {
   const [metrics, setMetrics] = useState({ companies: 0, users: 0, buses: 0, routes: 0, bookingsAll: 0, bookingsMonth: 0, revenueAll: 0 });
@@ -50,41 +50,56 @@ export default function DevOverviewTab() {
   });
 
   useEffect(() => {
-    (async () => {
-      try { 
-        const m = await getPlatformMetrics(); 
-        if (m?.data) setMetrics(m.data); 
-      } catch {}
-      try { 
-        const a = await getActivityLog(); 
-        setActivity(a.data || []); 
-      } catch {}
-      try {
-        const c = await getCompaniesLight();
-        setCompanies(c.data || []);
-      } catch {}
-    })();
+    loadData();
   }, []);
+
+  const loadData = async () => {
+    try { 
+      const m = await getPlatformMetrics(); 
+      if (m?.data) setMetrics(m.data); 
+    } catch (error) {
+      console.error('Error loading metrics:', error);
+    }
+    try { 
+      const a = await getActivityLogGlobal(); 
+      setActivity(a.data || []); 
+    } catch (error) {
+      console.error('Error loading activity:', error);
+    }
+    try {
+      const c = await getCompaniesLight();
+      setCompanies(c.data || []);
+    } catch (error) {
+      console.error('Error loading companies:', error);
+    }
+  };
 
   const handleCreateCompany = async () => {
     try {
-      // TODO: Implement create company functionality
-      console.log('Creating company:', companyForm);
+      await createCompany({
+        name: companyForm.name,
+        email: companyForm.email,
+        phone: companyForm.phone,
+        address: companyForm.address,
+        subscription_plan: companyForm.plan,
+        is_active: companyForm.status === 'Active'
+      });
       setShowCreateCompany(false);
       setCompanyForm({ name: '', email: '', phone: '', address: '', plan: 'Basic', status: 'Active' });
-      // Refresh metrics
-      const m = await getPlatformMetrics();
-      if (m?.data) setMetrics(m.data);
+      // Refresh data
+      loadData();
     } catch (error) {
       console.error('Error creating company:', error);
+      alert('Error creating company: ' + error.message);
     }
   };
 
   const handleManagePlans = async () => {
     try {
-      // TODO: Implement plan management functionality
+      // Plans are managed through platform settings
       console.log('Managing plans:', planForm);
       setShowManagePlans(false);
+      alert('Plan management is available in the Settings tab');
     } catch (error) {
       console.error('Error managing plans:', error);
     }
@@ -92,22 +107,46 @@ export default function DevOverviewTab() {
 
   const handleManageUsers = async () => {
     try {
-      // TODO: Implement user management functionality
-      console.log('Managing users:', userForm);
+      if (!userForm.selectedCompany || !userForm.name || !userForm.email) {
+        alert('Please fill in all required fields');
+        return;
+      }
+      await createUser({
+        name: userForm.name,
+        email: userForm.email,
+        role: userForm.role,
+        company_id: userForm.selectedCompany,
+        is_active: userForm.status === 'Active'
+      });
       setShowManageUsers(false);
+      setUserForm({ selectedCompany: '', name: '', email: '', role: 'admin', status: 'Active' });
+      // Refresh data
+      loadData();
     } catch (error) {
-      console.error('Error managing users:', error);
+      console.error('Error creating user:', error);
+      alert('Error creating user: ' + error.message);
     }
   };
 
   const handleSendAnnouncement = async () => {
     try {
-      // TODO: Implement send announcement functionality
-      console.log('Sending announcement:', announcementForm);
+      if (!announcementForm.title || !announcementForm.message) {
+        alert('Please fill in title and message');
+        return;
+      }
+      await createAnnouncement({
+        title: announcementForm.title,
+        message: announcementForm.message,
+        target_audience: announcementForm.targetAudience,
+        delivery_method: announcementForm.deliveryMethod,
+        priority: 'normal'
+      });
       setShowSendAnnouncement(false);
       setAnnouncementForm({ title: '', message: '', targetAudience: 'all', deliveryMethod: 'dashboard' });
+      alert('Announcement created successfully!');
     } catch (error) {
       console.error('Error sending announcement:', error);
+      alert('Error sending announcement: ' + error.message);
     }
   };
 

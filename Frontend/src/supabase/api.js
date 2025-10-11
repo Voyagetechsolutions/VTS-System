@@ -2481,21 +2481,33 @@ export async function getDriverTrips(driver_id, { from, to } = {}) {
 // Platform metrics & support
 export async function getPlatformMetrics() {
   try {
-    const [companies, users, bookings] = await Promise.all([
-      supabase.from('companies').select('company_id', { count: 'exact' }),
+    const today = new Date().toISOString().split('T')[0];
+    const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    
+    const [companies, users, buses, routes, bookingsAll, bookingsMonth, payments] = await Promise.all([
+      supabase.from('companies').select('company_id', { count: 'exact' }).eq('is_active', true),
       supabase.from('users').select('user_id', { count: 'exact' }),
+      supabase.from('buses').select('bus_id', { count: 'exact' }),
+      supabase.from('routes').select('route_id', { count: 'exact' }),
       supabase.from('bookings').select('booking_id, amount', { count: 'exact' }),
+      supabase.from('bookings').select('booking_id', { count: 'exact' }).gte('booking_date', firstDayOfMonth),
+      supabase.from('payments').select('amount').eq('status', 'completed'),
     ]);
+    
     return {
       data: {
-        totalCompanies: companies.count || 0,
-        totalUsers: users.count || 0,
-        totalBookings: bookings.count || 0,
-        totalRevenue: (bookings.data || []).reduce((sum, b) => sum + (b.amount || 0), 0)
+        companies: companies.count || 0,
+        users: users.count || 0,
+        buses: buses.count || 0,
+        routes: routes.count || 0,
+        bookingsAll: bookingsAll.count || 0,
+        bookingsMonth: bookingsMonth.count || 0,
+        revenueAll: (payments.data || []).reduce((sum, p) => sum + (p.amount || 0), 0)
       }
     };
   } catch (error) {
-    return { data: { totalCompanies: 0, totalUsers: 0, totalBookings: 0, totalRevenue: 0 }, error };
+    console.error('Error fetching platform metrics:', error);
+    return { data: { companies: 0, users: 0, buses: 0, routes: 0, bookingsAll: 0, bookingsMonth: 0, revenueAll: 0 }, error };
   }
 }
 export async function assignSupportTicket(ticket_id, assigned_to) {
