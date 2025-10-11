@@ -962,7 +962,7 @@ export async function suspendCompany(company_id) {
 
 // Developer: Users (global)
 export async function getAllUsersGlobal() {
-  return supabase.from('users').select('user_id, name, email, role, company_id, is_active, last_login');
+  return supabase.from('users').select('user_id, name, email, role, company_id, is_active');
 }
 export async function deactivateUserGlobal(user_id) {
   return supabase.from('users').update({ is_active: false }).eq('user_id', user_id);
@@ -2278,6 +2278,10 @@ export async function unblacklistCustomer(customer_id) {
 // Activity / Notifications
 export async function getActivityLog(companyId) {
   const cid = getCompanyId(companyId);
+  if (!cid) {
+    // If no company_id, get all logs (for developers)
+    return supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(200);
+  }
   return supabase.from('activity_log').select('*').eq('company_id', cid).order('created_at', { ascending: false }).limit(500);
 }
 export async function getNotifications(companyId) {
@@ -2489,7 +2493,7 @@ export async function getPlatformMetrics() {
       supabase.from('users').select('user_id', { count: 'exact' }),
       supabase.from('buses').select('bus_id', { count: 'exact' }),
       supabase.from('routes').select('route_id', { count: 'exact' }),
-      supabase.from('bookings').select('booking_id, amount', { count: 'exact' }),
+      supabase.from('bookings').select('booking_id', { count: 'exact' }),
       supabase.from('bookings').select('booking_id', { count: 'exact' }).gte('booking_date', firstDayOfMonth),
       supabase.from('payments').select('amount').eq('status', 'completed'),
     ]);
