@@ -1211,14 +1211,6 @@ export async function updateUserRoleGlobal(user_id, role) {
 // Lightweight companies list for filters
 // export async function getCompaniesLight() { DUPLICATE REMOVED }
 
-// Platform settings
-export async function getPlatformSettings() {
-  return supabase.from('platform_settings').select('*').limit(1).maybeSingle();
-}
-export async function upsertPlatformSettings(updates) {
-  return supabase.from('platform_settings').upsert([{ id: 1, ...updates }], { onConflict: 'id' });
-}
-
 // Company Admin dashboard KPIs and alerts
 export async function getCompanyDashboardKPIs(companyId) {
   const cid = getCompanyId(companyId);
@@ -1359,7 +1351,7 @@ export async function markMessageAsRead(messageId) {
     .eq('message_id', messageId);
 }
 
-export async function getAnnouncements(companyId) {
+export async function getCompanyAnnouncements(companyId) {
   const cid = getCompanyId(companyId);
   return supabase
     .from('announcements')
@@ -1370,7 +1362,7 @@ export async function getAnnouncements(companyId) {
     .order('created_at', { ascending: false });
 }
 
-export async function createAnnouncement(announcementData) {
+export async function createCompanyAnnouncement(announcementData) {
   const cid = getCompanyId();
   const uid = window.userId;
   

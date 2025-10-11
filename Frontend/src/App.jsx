@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, Suspense } from 'react';
-import { Routes, Route, useLocation, createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { Routes, Route, useLocation, createBrowserRouter, RouterProvider, BrowserRouter, Outlet } from 'react-router-dom';
 import { ThemeProvider, CssBaseline, IconButton, TextField, Button, Stack, AppBar, Toolbar, Typography, Box } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import api from './utils/apiClient';
@@ -26,54 +26,56 @@ const HRDashboard = React.lazy(() => import('./pages/HRDashboard/index'));
 const FleetTracking = React.lazy(() => import('./pages/FleetTracking/index'));
 import Login from './pages/Login';
 
+// TopBar component moved outside to be used in Layout
+function TopBar({ mode, toggleMode, companyIdInput, setCompanyIdInput, enqueueSnackbar }) {
+  const location = useLocation();
+  const show = location.pathname !== '/';
+  if (!show) return null;
+  return (
+    <AppBar position="fixed" color="default" elevation={1}>
+      <Toolbar>
+        <Typography variant="h6" sx={{ flexGrow: 1 }}>VTS</Typography>
+        <IconButton color="inherit" onClick={toggleMode} aria-label="toggle theme" size="small" sx={{ mr: 1 }}>
+          {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
+        </IconButton>
+        <TextField
+          size="small"
+          label="Company ID"
+          value={companyIdInput}
+          onChange={e => setCompanyIdInput(e.target.value)}
+          sx={{ width: 140, mr: 1 }}
+        />
+        <Button
+          variant="contained"
+          size="small"
+          onClick={() => {
+            try {
+              const v = (companyIdInput || '').trim();
+              window.companyId = v || null;
+              if (v) localStorage.setItem('companyId', v); else localStorage.removeItem('companyId');
+              enqueueSnackbar('Company ID updated', { variant: 'success' });
+            } catch {}
+          }}
+          sx={{ mr: 1 }}
+        >Set</Button>
+        <Button
+          variant="outlined"
+          size="small"
+          color="secondary"
+          onClick={async () => {
+            try { await api.logout(); } catch {}
+            try { window.location.assign('/'); } catch { window.location.href = '/'; }
+          }}
+        >Logout</Button>
+      </Toolbar>
+    </AppBar>
+  );
+}
+
 function App() {
   const [mode, setMode] = useState('light');
   const [companyIdInput, setCompanyIdInput] = useState('');
   const { enqueueSnackbar } = useSnackbar();
-  const TopBar = () => {
-    const location = useLocation();
-    const show = location.pathname !== '/';
-    if (!show) return null;
-    return (
-      <AppBar position="fixed" color="default" elevation={1}>
-        <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>VTS</Typography>
-          <IconButton color="inherit" onClick={toggleMode} aria-label="toggle theme" size="small" sx={{ mr: 1 }}>
-            {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
-          </IconButton>
-          <TextField
-            size="small"
-            label="Company ID"
-            value={companyIdInput}
-            onChange={e => setCompanyIdInput(e.target.value)}
-            sx={{ width: 140, mr: 1 }}
-          />
-          <Button
-            variant="contained"
-            size="small"
-            onClick={() => {
-              try {
-                const v = (companyIdInput || '').trim();
-                window.companyId = v || null;
-                if (v) localStorage.setItem('companyId', v); else localStorage.removeItem('companyId');
-                enqueueSnackbar('Company ID updated', { variant: 'success' });
-              } catch {}
-            }}
-            sx={{ mr: 1 }}
-          >Set</Button>
-          <Button
-            variant="outlined"
-            size="small"
-            color="secondary"
-            onClick={async () => {
-              try { await api.logout(); } catch {}
-              try { window.location.assign('/'); } catch { window.location.href = '/'; }
-            }}
-          >Logout</Button>
-        </Toolbar>
-      </AppBar>
-    );
-  };
   useEffect(() => {
     // Initialize window.companyId and window.userRole from Supabase auth
     (async () => {
@@ -126,39 +128,47 @@ function App() {
   useEffect(() => { try { const saved = localStorage.getItem('ui-mode'); if (saved) setMode(saved); } catch {} }, []);
   const muiTheme = useMemo(() => createTheme({ ...theme, palette: { ...theme.palette, mode } }), [mode]);
   const toggleMode = () => { setMode(m => { const next = m === 'light' ? 'dark' : 'light'; try { localStorage.setItem('ui-mode', next); } catch {} return next; }); };
+  
+  // Layout component that wraps all routes with TopBar
+  const Layout = () => (
+    <>
+      <TopBar mode={mode} toggleMode={toggleMode} companyIdInput={companyIdInput} setCompanyIdInput={setCompanyIdInput} enqueueSnackbar={enqueueSnackbar} />
+      <Toolbar />
+      <Box sx={{ px: 0 }}>
+        <Suspense fallback={null}>
+          <Outlet />
+        </Suspense>
+      </Box>
+    </>
+  );
+
+  const router = createBrowserRouter([
+    {
+      element: <Layout />,
+      children: [
+        { path: '/', element: <Login /> },
+        { path: '/signup', element: <Signup /> },
+        { path: '/developer-dashboard', element: <DeveloperDashboard /> },
+        { path: '/admin-dashboard', element: <CompanyAdminDashboard /> },
+        { path: '/ops-dashboard', element: <OperationsManagerDashboard /> },
+        { path: '/booking-dashboard', element: <BookingOfficeDashboard /> },
+        { path: '/boarding-operator-dashboard', element: <BoardingOperatorDashboard /> },
+        { path: '/driver-dashboard', element: <DriverDashboard /> },
+        { path: '/depot-dashboard', element: <DepotManagerDashboard /> },
+        { path: '/maintenance-dashboard', element: <MaintenanceManagerDashboard /> },
+        { path: '/finance-dashboard', element: <FinanceDashboard /> },
+        { path: '/hr-dashboard', element: <HRDashboard /> },
+        { path: '/fleet-tracking', element: <FleetTracking /> },
+      ]
+    }
+  ]);
+
   return (
     <ThemeProvider theme={muiTheme}>
       <CssBaseline />
       <SnackbarProvider maxSnack={3} autoHideDuration={3000} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
         <ErrorBoundary>
-          {(() => {
-            const router = createBrowserRouter([
-              { path: '/', element: <Login /> },
-              { path: '/signup', element: <Signup /> },
-              { path: '/developer-dashboard', element: <DeveloperDashboard /> },
-              { path: '/admin-dashboard', element: <CompanyAdminDashboard /> },
-              { path: '/ops-dashboard', element: <OperationsManagerDashboard /> },
-              { path: '/booking-dashboard', element: <BookingOfficeDashboard /> },
-              { path: '/boarding-operator-dashboard', element: <BoardingOperatorDashboard /> },
-              { path: '/driver-dashboard', element: <DriverDashboard /> },
-              { path: '/depot-dashboard', element: <DepotManagerDashboard /> },
-              { path: '/maintenance-dashboard', element: <MaintenanceManagerDashboard /> },
-              { path: '/finance-dashboard', element: <FinanceDashboard /> },
-              { path: '/hr-dashboard', element: <HRDashboard /> },
-              { path: '/fleet-tracking', element: <FleetTracking /> },
-            ]);
-            return (
-              <>
-                <TopBar />
-                <Toolbar />
-                <Box sx={{ px: 0 }}>
-                  <Suspense fallback={null}>
-                    <RouterProvider router={router} future={{ v7_startTransition: true, v7_relativeSplatPath: true }} />
-                  </Suspense>
-                </Box>
-              </>
-            );
-          })()}
+          <RouterProvider router={router} future={{ v7_startTransition: true, v7_relativeSplatPath: true }} />
         </ErrorBoundary>
       </SnackbarProvider>
     </ThemeProvider>
