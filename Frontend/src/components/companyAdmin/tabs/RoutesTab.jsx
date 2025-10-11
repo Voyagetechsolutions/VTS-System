@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Table, TableHead, TableRow, TableCell, TableBody, TablePagination, Button, TextField, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, Stack, Divider } from '@mui/material';
-import { getCompanyRoutes, createRoute, updateRoute, deleteRoute, getCountries, getCities, getRouteStopsTable, upsertRouteStopsTable, deleteRouteStopById, getRouteSchedulesTable, upsertRouteScheduleTable, deleteRouteScheduleById, getCompanyBuses, getDrivers, assignBusToRoute, assignDriverToRoute } from '../../../supabase/api';
+import { getCompanyRoutes, createRoute, updateRoute, deleteRoute, getCountries, getCities, getRouteStopsTable, upsertRouteStopsTable, deleteRouteStopById, getRouteSchedulesByRouteId, upsertRouteScheduleTable, deleteRouteScheduleById, getCompanyBuses, getDrivers, assignBusToRoute, assignDriverToRoute, getCompanySettings } from '../../../supabase/api';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 
@@ -21,8 +21,9 @@ export default function RoutesTab() {
   const [busOptions, setBusOptions] = useState([]);
   const [driverOptions, setDriverOptions] = useState([]);
   const [assign, setAssign] = useState({ bus_id: '', driver_id: '' });
+  const [canEdit, setCanEdit] = useState(true);
 
-  useEffect(() => { getCompanyRoutes().then(({ data }) => setRoutes(data || [])); getCountries().then(res => setCountries(res.data || [])); }, []);
+  useEffect(() => { getCompanyRoutes().then(({ data }) => setRoutes(data || [])); getCountries().then(res => setCountries(res.data || [])); (async () => { try { const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole') || 'admin'; const { data } = await getCompanySettings(); setCanEdit(!!(data?.rbac?.[role]?.edit)); } catch { setCanEdit(true); } })(); }, []);
   useEffect(() => { if (form.country_id) getCities(form.country_id).then(res => setCities(res.data || [])); }, [form.country_id]);
 
   const filtered = routes.filter(r => (r.origin || '').toLowerCase().includes(search.toLowerCase()) || (r.destination || '').toLowerCase().includes(search.toLowerCase()))
@@ -34,7 +35,7 @@ export default function RoutesTab() {
     setActionsForm({ route_code: r.route_code || '', status: r.status || 'active', distance_km: r.distance_km || '', estimated_travel_time: r.estimated_travel_time || '', road_type: r.road_type || '', currency: r.currency || 'ZAR', permit_number: r.permit_number || '', discount_amount: r.discount_amount || '', discount_percent: r.discount_percent || '' });
     const [st, sc, buses, drivers] = await Promise.all([
       getRouteStopsTable(r.route_id),
-      getRouteSchedulesTable(r.route_id),
+      getRouteSchedulesByRouteId(r.route_id),
       getCompanyBuses(),
       getDrivers(),
     ]);
@@ -81,7 +82,7 @@ export default function RoutesTab() {
     await updateRoute(editing.route_id, payload);
     await upsertRouteStopsTable(editing.route_id, stops.map((s, i) => ({ id: s.id, sort_order: i + 1, name: s.name, city_id: s.city_id || null, eta: s.eta || null, etd: s.etd || null })));
     for (const sc of schedules) {
-      await upsertRouteScheduleTable(editing.route_id, sc);
+      await upsertRouteScheduleTable({ ...sc, route_id: editing.route_id });
     }
     // Update summary fields for list display (departure_times/arrival_times/frequency)
     try {
@@ -99,7 +100,7 @@ export default function RoutesTab() {
   return (
     <>
       <TextField label="Search Routes" value={search} onChange={e => setSearch(e.target.value)} sx={{ mb: 2 }} />
-      <Button variant="contained" color="primary" sx={{ mb: 2 }} onClick={openNew}>Add Route</Button>
+      {canEdit && <Button variant="contained" color="primary" sx={{ mb: 2 }} onClick={openNew}>Add Route</Button>}
       <Table>
         <TableHead>
           <TableRow>
@@ -122,9 +123,11 @@ export default function RoutesTab() {
               <TableCell>{r.frequency || '-'}</TableCell>
               <TableCell>{r.price != null ? Number(r.price) : '-'}</TableCell>
               <TableCell>
-                <Button size="small" variant="outlined" onClick={() => openActions(r)}>Actions</Button>
-                <IconButton onClick={() => openEdit(r)}><EditIcon /></IconButton>
-                <IconButton onClick={async () => { await deleteRoute(r.route_id); try { await window.supabase.from('activity_log').insert([{ company_id: window.companyId, type: 'route_delete', message: JSON.stringify({ route_id: r.route_id, by: window.userId }) }]); } catch {} getCompanyRoutes().then(({ data }) => setRoutes(data || [])); }}><DeleteIcon /></IconButton>
+                {canEdit && <Button size="small" variant="outlined" onClick={() => openActions(r)}>Actions</Button>}
+                {canEdit && <IconButton onClick={() => openEdit(r)}><EditIcon /></IconButton>}
+                {canEdit && (
+                  <IconButton onClick={async () => { await deleteRoute(r.route_id); try { await window.supabase.from('activity_log').insert([{ company_id: window.companyId, type: 'route_delete', message: JSON.stringify({ route_id: r.route_id, by: window.userId }) }]); } catch {} getCompanyRoutes().then(({ data }) => setRoutes(data || [])); }}><DeleteIcon /></IconButton>
+                )}
               </TableCell>
             </TableRow>
           ))}
@@ -165,7 +168,7 @@ export default function RoutesTab() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={save}>Save</Button>
+          {canEdit && <Button variant="contained" onClick={save}>Save</Button>}
         </DialogActions>
       </Dialog>
 
@@ -239,8 +242,8 @@ export default function RoutesTab() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setActionsOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={saveActions}>Save</Button>
+          <Button onClick={() => setActionsOpen(false)}>Close</Button>
+          {canEdit && <Button variant="contained" onClick={saveActions}>Save</Button>}
         </DialogActions>
       </Dialog>
     </>

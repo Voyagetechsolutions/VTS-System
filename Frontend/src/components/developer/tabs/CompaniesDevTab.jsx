@@ -65,9 +65,8 @@ export default function CompaniesDevTab() {
   const filtered = rows.filter(r => (
     (companyFilter ? r.company_id === companyFilter : true) &&
     (statusFilter ? (statusFilter === 'active' ? r.is_active : !r.is_active) : true) &&
-    (planFilter ? r.plan === planFilter : true) &&
+    (planFilter ? r.subscription_plan === planFilter : true) &&
     ((searchName || '').trim() === '' ? true : (r.name || '').toLowerCase().includes(searchName.toLowerCase())) &&
-    ((searchEmail || '').trim() === '' ? true : (r.email || '').toLowerCase().includes(searchEmail.toLowerCase())) &&
     inRange(r.created_at)
   ));
 
@@ -164,13 +163,19 @@ export default function CompaniesDevTab() {
               />
             </Grid>
             <Grid item xs={12} sm={6} md={2}>
-              <TextField
-                fullWidth
-                label="Search by Email"
-                value={searchEmail}
-                onChange={(e) => setSearchEmail(e.target.value)}
-                size="small"
-              />
+              <FormControl fullWidth size="small">
+                <InputLabel>Company</InputLabel>
+                <Select
+                  value={companyFilter}
+                  label="Company"
+                  onChange={(e) => setCompanyFilter(e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  {companies.map(c => (
+                    <MenuItem key={c.company_id} value={c.company_id}>{c.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Grid>
             <Grid item xs={12} sm={6} md={2}>
               <FormControl fullWidth size="small">
@@ -248,21 +253,11 @@ export default function CompaniesDevTab() {
                 )
               },
               { 
-                field: 'email', 
-                headerName: 'Contact Email',
-                renderCell: (params) => (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <EmailIcon fontSize="small" color="action" />
-                    {params.value}
-                  </Box>
-                )
-              },
-              { 
-                field: 'plan', 
+                field: 'subscription_plan', 
                 headerName: 'Plan',
                 renderCell: (params) => (
                   <Chip 
-                    label={params.value || 'Basic'} 
+                    label={params.value || 'Free'} 
                     color={params.value === 'Premium' ? 'primary' : params.value === 'Standard' ? 'secondary' : 'default'}
                     size="small"
                   />
@@ -390,8 +385,12 @@ export default function CompaniesDevTab() {
                 <Typography variant="body1">{selectedCompany.name}</Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <Typography variant="subtitle2" color="text.secondary">Email</Typography>
-                <Typography variant="body1">{selectedCompany.email}</Typography>
+                <Typography variant="subtitle2" color="text.secondary">Plan</Typography>
+                <Chip 
+                  label={selectedCompany.subscription_plan || 'Free'} 
+                  color={selectedCompany.subscription_plan === 'Premium' ? 'primary' : 'default'}
+                  size="small"
+                />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography variant="subtitle2" color="text.secondary">Status</Typography>

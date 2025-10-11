@@ -53,100 +53,14 @@ export default function BookingsDevTab() {
     try {
       const companiesRes = await getCompaniesLight();
       setCompanies(companiesRes.data || []);
-      
-      // Mock bookings data - replace with actual API call
-      const mockBookings = [
-        {
-          id: 'BK-1001',
-          passengerName: 'M. Ndlovu',
-          passengerEmail: 'm.ndlovu@email.com',
-          companyId: 'comp-1',
-          routeName: 'Joburg → Bulawayo',
-          bookingDate: '2025-01-16T08:00:00Z',
-          travelDate: '2025-01-20T10:00:00Z',
-          status: 'confirmed',
-          amount: 700,
-          seatNumber: 'A12',
-          createdAt: '2025-01-15T14:30:00Z'
-        },
-        {
-          id: 'BK-1002',
-          passengerName: 'T. Dube',
-          passengerEmail: 't.dube@email.com',
-          companyId: 'comp-2',
-          routeName: 'Pretoria → Harare',
-          bookingDate: '2025-01-17T09:15:00Z',
-          travelDate: '2025-01-21T11:30:00Z',
-          status: 'cancelled',
-          amount: 0,
-          seatNumber: 'B05',
-          createdAt: '2025-01-16T10:45:00Z'
-        },
-        {
-          id: 'BK-1003',
-          passengerName: 'S. Mthembu',
-          passengerEmail: 's.mthembu@email.com',
-          companyId: 'comp-1',
-          routeName: 'Cape Town → Durban',
-          bookingDate: '2025-01-18T12:00:00Z',
-          travelDate: '2025-01-22T14:00:00Z',
-          status: 'pending',
-          amount: 850,
-          seatNumber: 'C08',
-          createdAt: '2025-01-17T16:20:00Z'
-        }
-      ];
-      
-      // Mock transactions data - replace with actual API call
-      const mockTransactions = [
-        {
-          id: 'TX-9001',
-          bookingId: 'BK-1001',
-          companyId: 'comp-1',
-          amount: 700,
-          paymentMethod: 'card',
-          status: 'paid',
-          transactionDate: '2025-01-16T08:05:00Z',
-          gatewayResponse: 'success',
-          createdAt: '2025-01-16T08:05:00Z'
-        },
-        {
-          id: 'TX-9002',
-          bookingId: 'BK-1002',
-          companyId: 'comp-2',
-          amount: 0,
-          paymentMethod: 'eft',
-          status: 'failed',
-          transactionDate: '2025-01-17T09:20:00Z',
-          gatewayResponse: 'insufficient_funds',
-          createdAt: '2025-01-17T09:20:00Z'
-        },
-        {
-          id: 'TX-9003',
-          bookingId: 'BK-1003',
-          companyId: 'comp-1',
-          amount: 850,
-          paymentMethod: 'card',
-          status: 'pending',
-          transactionDate: '2025-01-18T12:05:00Z',
-          gatewayResponse: 'processing',
-          createdAt: '2025-01-18T12:05:00Z'
-        }
-      ];
-      
-      setBookings(mockBookings);
-      setTransactions(mockTransactions);
-      
-      // Calculate analytics
+      // Clear mock data: initialize with empty datasets and zeroed analytics
+      setBookings([]);
+      setTransactions([]);
       setAnalytics({
-        totalBookings: mockBookings.length,
-        totalRevenue: mockTransactions.filter(t => t.status === 'paid').reduce((sum, t) => sum + t.amount, 0),
-        failedTransactions: mockTransactions.filter(t => t.status === 'failed').length,
-        topRoutes: [
-          { route: 'Joburg → Bulawayo', bookings: 15 },
-          { route: 'Pretoria → Harare', bookings: 12 },
-          { route: 'Cape Town → Durban', bookings: 8 }
-        ]
+        totalBookings: 0,
+        totalRevenue: 0,
+        failedTransactions: 0,
+        topRoutes: []
       });
     } catch (error) {
       console.error('Error loading data:', error);

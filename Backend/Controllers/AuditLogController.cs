@@ -7,11 +7,16 @@ using Microsoft.AspNetCore.Authorization;
 namespace Backend.Controllers {
     [ApiController]
     [Route("api/[controller]")]
+<<<<<<< HEAD
     [Authorize]
+=======
+    [Authorize(Policy = "CompanyScoped")]
+>>>>>>> 04b39f5 (Add route schedules and update authentication system)
     public class AuditLogController : ControllerBase {
         private readonly AppDbContext _db;
         public AuditLogController(AppDbContext db) { _db = db; }
         // GET: api/auditlog
+        [Authorize(Roles = "admin,developer")]
         [HttpGet]
         public async Task<IActionResult> GetAuditLogs([FromQuery] int? companyId = null) {
             var cid = companyId;

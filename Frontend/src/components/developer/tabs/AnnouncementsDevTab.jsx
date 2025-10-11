@@ -3,7 +3,7 @@ import { Box, Grid, Card, CardContent, Typography, Button, Chip, Dialog, DialogT
 import { Add as AddIcon, Send as SendIcon, Visibility as ViewIcon, Edit as EditIcon, Delete as DeleteIcon, Announcement as AnnouncementIcon, Business as BusinessIcon, People as PeopleIcon, Email as EmailIcon, Notifications as NotificationsIcon } from '@mui/icons-material';
 import DashboardCard from '../../common/DashboardCard';
 import DataTable from '../../common/DataTable';
-import { getCompaniesLight } from '../../../supabase/api';
+import { getCompaniesLight, getAnnouncements, createAnnouncement, sendAnnouncement, deleteAnnouncement } from '../../../supabase/api';
 
 export default function AnnouncementsDevTab() {
   const [announcements, setAnnouncements] = useState([]);
@@ -34,46 +34,13 @@ export default function AnnouncementsDevTab() {
   const load = async () => {
     setLoading(true);
     try {
-      const companiesRes = await getCompaniesLight();
-      setCompanies(companiesRes.data || []);
+      const [companiesRes, announcementsRes] = await Promise.all([
+        getCompaniesLight(),
+        getAnnouncements()
+      ]);
       
-      // Mock announcements data - replace with actual API call
-      const mockAnnouncements = [
-        {
-          id: 1,
-          title: 'System Maintenance Notice',
-          message: 'Scheduled maintenance will occur on Sunday from 2-4 AM. Some features may be temporarily unavailable.',
-          targetAudience: 'all',
-          deliveryMethod: 'both',
-          priority: 'high',
-          status: 'sent',
-          sentAt: '2025-01-15T10:00:00Z',
-          sentBy: 'System Admin'
-        },
-        {
-          id: 2,
-          title: 'New Feature Release',
-          message: 'We are excited to announce the release of our new mobile app features. Check out the enhanced booking experience!',
-          targetAudience: 'all',
-          deliveryMethod: 'dashboard',
-          priority: 'normal',
-          status: 'sent',
-          sentAt: '2025-01-14T15:30:00Z',
-          sentBy: 'Developer Team'
-        },
-        {
-          id: 3,
-          title: 'Payment Gateway Update',
-          message: 'Important: Please update your payment gateway settings by the end of this month to ensure uninterrupted service.',
-          targetAudience: 'company_admins',
-          deliveryMethod: 'email',
-          priority: 'high',
-          status: 'draft',
-          sentAt: null,
-          sentBy: 'Finance Team'
-        }
-      ];
-      setAnnouncements(mockAnnouncements);
+      setCompanies(companiesRes.data || []);
+      setAnnouncements(announcementsRes.data || []);
     } catch (error) {
       console.error('Error loading data:', error);
     }
@@ -90,8 +57,13 @@ export default function AnnouncementsDevTab() {
 
   const handleCreateAnnouncement = async () => {
     try {
-      // TODO: Implement create announcement functionality
-      console.log('Creating announcement:', newAnnouncement);
+      await createAnnouncement({
+        title: newAnnouncement.title,
+        message: newAnnouncement.message,
+        target_audience: newAnnouncement.targetAudience,
+        delivery_method: newAnnouncement.deliveryMethod,
+        priority: newAnnouncement.priority
+      });
       setShowCreateAnnouncement(false);
       setNewAnnouncement({
         title: '',
@@ -115,8 +87,7 @@ export default function AnnouncementsDevTab() {
 
   const handleSendAnnouncement = async (announcementId) => {
     try {
-      // TODO: Implement send announcement functionality
-      console.log('Sending announcement:', announcementId);
+      await sendAnnouncement(announcementId);
       load();
     } catch (error) {
       console.error('Error sending announcement:', error);
@@ -125,8 +96,7 @@ export default function AnnouncementsDevTab() {
 
   const handleDeleteAnnouncement = async (announcementId) => {
     try {
-      // TODO: Implement delete announcement functionality
-      console.log('Deleting announcement:', announcementId);
+      await deleteAnnouncement(announcementId);
       load();
     } catch (error) {
       console.error('Error deleting announcement:', error);

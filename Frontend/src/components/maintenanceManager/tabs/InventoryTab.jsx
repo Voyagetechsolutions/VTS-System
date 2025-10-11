@@ -1,22 +1,51 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Card, CardContent, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControl, InputLabel, Select, MenuItem, Chip, IconButton, Avatar, Grid, FormControlLabel, Switch } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Inventory as InventoryIcon, DirectionsBus as BusIcon, ShoppingCart as ShoppingCartIcon, QrCodeScanner as QrCodeScannerIcon } from '@mui/icons-material';
 import DataTable from '../../common/DataTable';
 import { supabase } from '../../../supabase/client';
+import { getCompanySettings } from '../../../supabase/api';
 
 export default function InventoryTab() {
   const [stock, setStock] = useState([]);
   const [usage, setUsage] = useState([]);
-  const [po, setPO] = useState([]);
+  const [procurement, setProcurement] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showAddStock, setShowAddStock] = useState(false);
+  const [showAddUsage, setShowAddUsage] = useState(false);
+  const [showAddProcurement, setShowAddProcurement] = useState(false);
+  const [canEdit, setCanEdit] = useState(true);
   const companyId = window.companyId || localStorage.getItem('companyId');
-  useEffect(() => { (async () => {
-    const [{ data: s }, { data: u }, { data: p }] = await Promise.all([
-      supabase.from('inventory').select('id, item, quantity, min_threshold, unit').eq('company_id', companyId),
-      supabase.from('inventory_usage').select('id, item, bus_id, quantity, used_at').eq('company_id', companyId),
-      supabase.from('purchase_orders').select('id, item, quantity, status, expected_at').eq('company_id', companyId),
-    ]);
-    setStock(s||[]); setUsage(u||[]); setPO(p||[]);
-  })(); }, [companyId]);
+  useEffect(() => {
+    setLoading(true);
+    (async () => {
+      try {
+        const stockQ = supabase
+          .from('inventory_stock')
+          .select('id, part_name, quantity, location, status')
+          .eq('company_id', companyId)
+          .order('part_name');
+        const usageQ = supabase
+          .from('inventory_usage')
+          .select('id, part_id, bus_id, quantity, used_at, staff, inventory_stock:part_id(part_name)')
+          .eq('company_id', companyId)
+          .order('used_at', { ascending: false });
+        const procureQ = supabase
+          .from('inventory_procurement')
+          .select('id, supplier, part_name, quantity, delivery_date, status')
+          .eq('company_id', companyId)
+          .order('delivery_date', { ascending: false });
+        const [{ data: s }, { data: u }, { data: p }] = await Promise.all([stockQ, usageQ, procureQ]);
+        setStock((s||[]).map(r => ({ id: r.id, item: r.part_name, quantity: r.quantity, location: r.location, status: r.status })));
+        setUsage((u||[]).map(r => ({ id: r.id, item: r.inventory_stock?.part_name || '(unknown)', bus_id: r.bus_id, quantity: r.quantity, used_at: r.used_at, staff_id: r.staff })));
+        setProcurement((p||[]).map(r => ({ id: r.id, item: r.part_name, supplier: r.supplier, quantity: r.quantity, expected_at: r.delivery_date, status: r.status })));
+      } catch (error) {
+        console.error('Error fetching inventory data:', error);
+      } finally {
+        setLoading(false);
+      }
+    })();
+    (async () => { try { const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole') || 'admin'; const { data } = await getCompanySettings(); setCanEdit(!!(data?.rbac?.[role]?.edit)); } catch { setCanEdit(true); } })();
+  }, [companyId]);
   const scanBarcode = async () => {
     const code = prompt('Scan/Enter Part Code');
     if (!code) return;
@@ -28,12 +57,74 @@ export default function InventoryTab() {
   };
 
   const autoOrderLow = async () => {
-    const low = (stock||[]).filter(x => Number(x.quantity||0) <= Number(x.min_threshold||0));
-    if (!low.length) return alert('No low stock items.');
-    const rows = low.map(x => ({ company_id: companyId, item: x.item, quantity: (x.min_threshold||0) * 2, status: 'ordered' }));
-    await supabase.from('purchase_orders').insert(rows);
-    const { data: p } = await supabase.from('purchase_orders').select('id, item, quantity, status, expected_at').eq('company_id', companyId);
-    setPO(p||[]);
+    const low = (stock||[]).filter(x => (x.status||'').toLowerCase() === 'low');
+    if (!low.length) return alert('No low stock items marked low.');
+    const rows = low.map(x => ({ company_id: companyId, part_name: x.item, quantity: Number(x.quantity||0) + 10, status: 'ordered' }));
+    await supabase.from('inventory_procurement').insert(rows);
+    const { data: p } = await supabase.from('inventory_procurement').select('id, supplier, part_name, quantity, delivery_date, status').eq('company_id', companyId);
+    setProcurement((p||[]).map(r => ({ id: r.id, item: r.part_name, supplier: r.supplier, quantity: r.quantity, expected_at: r.delivery_date, status: r.status })));
+  };
+
+  const handleAddStock = async (formData) => {
+    try {
+      await supabase.from('inventory_stock').insert([{
+        company_id: companyId,
+        part_name: formData.item,
+        quantity: Number(formData.quantity),
+        location: formData.location || null,
+        status: formData.status || 'ok',
+      }]);
+      const { data: s } = await supabase.from('inventory_stock').select('id, part_name, quantity, location, status').eq('company_id', companyId);
+      setStock((s||[]).map(r => ({ id: r.id, item: r.part_name, quantity: r.quantity, location: r.location, status: r.status })));
+    } catch (error) {
+      console.error('Error adding stock:', error);
+    }
+  };
+
+  const handleAddUsage = async (formData) => {
+    try {
+      // Resolve part_id by part_name; create stock item if missing
+      const partName = formData.item;
+      let { data: stockRows } = await supabase.from('inventory_stock').select('id').eq('company_id', companyId).eq('part_name', partName).limit(1);
+      let part_id = stockRows?.[0]?.id;
+      if (!part_id) {
+        const { data: inserted, error } = await supabase.from('inventory_stock').insert([{ company_id: companyId, part_name: partName, quantity: 0, status: 'ok' }]).select('id').single();
+        if (!error) part_id = inserted?.id;
+      }
+      if (!part_id) throw new Error('Failed to resolve part_id');
+      await supabase.from('inventory_usage').insert([{ company_id: companyId, part_id, bus_id: formData.bus_id || null, quantity: Number(formData.quantity), staff: formData.staff_id || null }]);
+      const { data: u } = await supabase
+        .from('inventory_usage')
+        .select('id, part_id, bus_id, quantity, used_at, staff, inventory_stock:part_id(part_name)')
+        .eq('company_id', companyId)
+        .order('used_at', { ascending: false });
+      setUsage((u||[]).map(r => ({ id: r.id, item: r.inventory_stock?.part_name || '(unknown)', bus_id: r.bus_id, quantity: r.quantity, used_at: r.used_at, staff_id: r.staff })));
+    } catch (error) {
+      console.error('Error adding usage:', error);
+    }
+  };
+
+  const handleAddProcurement = async (formData) => {
+    try {
+      await supabase.from('inventory_procurement').insert([{ company_id: companyId, part_name: formData.item, supplier: formData.supplier || null, quantity: Number(formData.quantity), delivery_date: formData.expected_at || null, status: 'ordered' }]);
+      const { data: p } = await supabase.from('inventory_procurement').select('id, supplier, part_name, quantity, delivery_date, status').eq('company_id', companyId);
+      setProcurement((p||[]).map(r => ({ id: r.id, item: r.part_name, supplier: r.supplier, quantity: r.quantity, expected_at: r.delivery_date, status: r.status })));
+    } catch (error) {
+      console.error('Error adding procurement:', error);
+    }
+  };
+
+  const handleDepleteStock = async (id, currentQuantity) => {
+    const qty = Number(prompt('Quantity to deplete?') || 0);
+    if (qty <= 0) return;
+    try {
+      await supabase.from('inventory').update({ quantity: currentQuantity - qty }).eq('id', id);
+      // Refresh data
+      const { data: s } = await supabase.from('inventory').select('id, item, quantity, min_threshold, unit, category').eq('company_id', companyId);
+      setStock(s||[]);
+    } catch (error) {
+      console.error('Error depleting stock:', error);
+    }
   };
 
   return (
@@ -44,20 +135,16 @@ export default function InventoryTab() {
           Inventory & Parts Management
         </Typography>
         <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button
-            variant="outlined"
-            startIcon={<QrCodeScannerIcon />}
-            onClick={() => setShowAddUsage(true)}
-          >
-            Scan/Use Part
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setShowAddStock(true)}
-          >
-            Add Stock
-          </Button>
+          {canEdit && (
+            <Button variant="outlined" startIcon={<QrCodeScannerIcon />} onClick={() => setShowAddUsage(true)}>
+              Scan/Use Part
+            </Button>
+          )}
+          {canEdit && (
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowAddStock(true)}>
+              Add Stock
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -81,53 +168,21 @@ export default function InventoryTab() {
                   </Box>
                 )
               },
-              { 
-                field: 'category', 
-                headerName: 'Category',
-                renderCell: (params) => (
-                  <Chip 
-                    label={params.value || 'General'} 
-                    size="small" 
-                    color="info"
-                  />
-                )
-              },
+              { field: 'location', headerName: 'Location' },
               { 
                 field: 'quantity', 
                 headerName: 'Quantity Available',
-                renderCell: (params) => {
-                  const isLowStock = params.value <= params.row.min_threshold;
-                  return (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="body2" fontWeight="medium">
-                        {params.value} {params.row.unit}
-                      </Typography>
-                      {isLowStock && (
-                        <Chip 
-                          label="Low Stock" 
-                          size="small" 
-                          color="warning"
-                        />
-                      )}
-                    </Box>
-                  );
-                }
-              },
-              { 
-                field: 'min_threshold', 
-                headerName: 'Min Stock',
                 renderCell: (params) => (
-                  <Typography variant="body2" color="text.secondary">
-                    {params.value} {params.row.unit}
-                  </Typography>
+                  <Typography variant="body2" fontWeight="medium">{params.value}</Typography>
                 )
-              }
+              },
+              { field: 'status', headerName: 'Status', renderCell: (p) => <Chip label={p.value||'ok'} size="small" color={(p.value||'ok')==='low'?'warning':(p.value||'ok')==='out'?'error':'success'} /> }
             ]}
-            rowActions={[
+            rowActions={canEdit ? [
               { label: 'Add', icon: <AddIcon />, onClick: ({ row }) => console.log('Add', row) },
               { label: 'Edit', icon: <EditIcon />, onClick: ({ row }) => console.log('Edit', row) },
               { label: 'Deplete', icon: <DeleteIcon />, onClick: ({ row }) => handleDepleteStock(row.id, row.quantity) }
-            ]}
+            ] : []}
             searchable
             pagination
           />
@@ -139,13 +194,11 @@ export default function InventoryTab() {
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6">Usage Table</Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setShowAddUsage(true)}
-            >
-              Quick Add Usage
-            </Button>
+            {canEdit && (
+              <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowAddUsage(true)}>
+                Quick Add Usage
+              </Button>
+            )}
           </Box>
           <DataTable
             data={usage}
@@ -161,13 +214,13 @@ export default function InventoryTab() {
                 )
               },
               { 
-                field: 'busPlate', 
+                field: 'bus_id', 
                 headerName: 'Bus / Vehicle',
                 renderCell: (params) => (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <BusIcon fontSize="small" color="action" />
                     <Typography variant="body2">
-                      {params.value}
+                      {params.value || 'N/A'}
                     </Typography>
                   </Box>
                 )
@@ -191,19 +244,19 @@ export default function InventoryTab() {
                 )
               },
               { 
-                field: 'staffName', 
+                field: 'staff_id', 
                 headerName: 'Responsible Staff',
                 renderCell: (params) => (
                   <Typography variant="body2">
-                    {params.value}
+                    {params.value || 'N/A'}
                   </Typography>
                 )
               }
             ]}
-            rowActions={[
+            rowActions={canEdit ? [
               { label: 'Edit', icon: <EditIcon />, onClick: ({ row }) => console.log('Edit', row) },
               { label: 'View Details', icon: <InventoryIcon />, onClick: ({ row }) => console.log('View', row) }
-            ]}
+            ] : []}
             searchable
             pagination
           />
@@ -215,13 +268,11 @@ export default function InventoryTab() {
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6">Procurement Table</Typography>
-            <Button
-              variant="contained"
-              startIcon={<ShoppingCartIcon />}
-              onClick={() => setShowAddProcurement(true)}
-            >
-              Add Procurement
-            </Button>
+            {canEdit && (
+              <Button variant="contained" startIcon={<ShoppingCartIcon />} onClick={() => setShowAddProcurement(true)}>
+                Add Procurement
+              </Button>
+            )}
           </Box>
           <DataTable
             data={procurement}
@@ -275,10 +326,10 @@ export default function InventoryTab() {
                 )
               }
             ]}
-            rowActions={[
+            rowActions={canEdit ? [
               { label: 'Edit', icon: <EditIcon />, onClick: ({ row }) => console.log('Edit', row) },
               { label: 'View Details', icon: <ShoppingCartIcon />, onClick: ({ row }) => console.log('View', row) }
-            ]}
+            ] : []}
             searchable
             pagination
           />
@@ -286,34 +337,28 @@ export default function InventoryTab() {
       </Card>
 
       {/* Modals */}
-      <AddStockModal
+      {canEdit && <AddStockModal
         open={showAddStock}
         onClose={() => setShowAddStock(false)}
         onSave={handleAddStock}
-      />
-      <AddUsageModal
+      />}
+      {canEdit && <AddUsageModal
         open={showAddUsage}
         onClose={() => setShowAddUsage(false)}
         onSave={handleAddUsage}
-      />
-      <AddProcurementModal
+      />}
+      {canEdit && <AddProcurementModal
         open={showAddProcurement}
         onClose={() => setShowAddProcurement(false)}
         onSave={handleAddProcurement}
-      />
+      />}
     </Box>
   );
 }
 
 // Add Stock Modal
 function AddStockModal({ open, onClose, onSave }) {
-  const [formData, setFormData] = useState({
-    item: '',
-    category: '',
-    quantity: '',
-    min_threshold: '',
-    unit: 'pcs'
-  });
+  const [formData, setFormData] = useState({ item: '', quantity: '', location: '', status: 'ok' });
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -336,29 +381,8 @@ function AddStockModal({ open, onClose, onSave }) {
                 required
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Category"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="e.g., Engine, Brake, Electrical"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Unit"
-                value={formData.unit}
-                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                select
-              >
-                <MenuItem value="pcs">Pieces</MenuItem>
-                <MenuItem value="liters">Liters</MenuItem>
-                <MenuItem value="kg">Kilograms</MenuItem>
-                <MenuItem value="meters">Meters</MenuItem>
-              </TextField>
-            </Grid>
+            <Grid item xs={12} sm={6}><TextField fullWidth label="Location" value={formData.location} onChange={(e)=>setFormData({...formData, location: e.target.value})} /></Grid>
+            <Grid item xs={12} sm={6}><TextField fullWidth label="Status" value={formData.status} onChange={(e)=>setFormData({...formData, status: e.target.value})} placeholder="ok/low/out" /></Grid>
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
@@ -369,16 +393,7 @@ function AddStockModal({ open, onClose, onSave }) {
                 required
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Min Threshold"
-                type="number"
-                value={formData.min_threshold}
-                onChange={(e) => setFormData({ ...formData, min_threshold: e.target.value })}
-                required
-              />
-            </Grid>
+            
           </Grid>
         </DialogContent>
         <DialogActions>

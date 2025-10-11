@@ -3,17 +3,25 @@ using Backend.Models;
 using Backend.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
+<<<<<<< HEAD
 using Backend.Payments;
+=======
+>>>>>>> 04b39f5 (Add route schedules and update authentication system)
 
 namespace Backend.Controllers {
     [ApiController]
     [Route("api/[controller]")]
+<<<<<<< HEAD
     [Authorize]
+=======
+    [Authorize(Policy = "CompanyScoped")]
+>>>>>>> 04b39f5 (Add route schedules and update authentication system)
     public class PaymentController : ControllerBase {
         private readonly AppDbContext _db;
         private readonly PayGateService _payGate;
         public PaymentController(AppDbContext db, PayGateService payGate) { _db = db; _payGate = payGate; }
         // GET: api/payment
+        [Authorize(Roles = "admin,developer,finance_manager")]
         [HttpGet]
         public async Task<IActionResult> GetPayments([FromQuery] int? companyId = null) {
             var cid = companyId;
@@ -117,6 +125,7 @@ namespace Backend.Controllers {
             public int? BookingId { get; set; }
         }
         // POST: api/payment
+        [Authorize(Roles = "admin,developer,finance_manager")]
         [HttpPost]
         public async Task<IActionResult> CreatePayment([FromBody] Payment payment) {
             if (payment == null) return BadRequest();

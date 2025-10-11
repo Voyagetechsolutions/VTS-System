@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Grid, Box } from '@mui/material';
-import DashboardCard from '../../common/DashboardCard';
+import { Grid, Box, Typography } from '@mui/material';
+import DashboardCard, { StatsCard } from '../../common/DashboardCard';
+import PieChart from '../../charts/PieChart';
+import BarChart from '../../charts/BarChart';
 import DataTable from '../../common/DataTable';
 import { getDrivers, listTripSchedules, listDriverTraining, upsertDriverTraining, listDriverKPIs, listDriverShifts, upsertDriverShift } from '../../../database';
 import { ModernTextField, ModernSelect, ModernButton } from '../../common/FormComponents';
@@ -34,6 +36,40 @@ export default function DriverHubTab() {
 
   return (
     <Grid container spacing={2}>
+      <Grid item xs={12}>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6} md={3}><StatsCard title="Drivers Active" value={drivers.length} icon="users" color="primary" /></Grid>
+          <Grid item xs={12} sm={6} md={3}><StatsCard title="Shifts Today" value={shifts.filter(s => (s.start_time||'').slice(0,10) === new Date().toISOString().slice(0,10)).length} icon="schedule" color="info" /></Grid>
+          <Grid item xs={12} sm={6} md={3}><StatsCard title="Training Complete" value={`${Math.round((training.filter(t => (t.status||'').toLowerCase()==='completed').length / Math.max(training.length,1)) * 100)}%`} icon="check" color="success" /></Grid>
+          <Grid item xs={12} sm={6} md={3}><StatsCard title="Avg On-time %" value={`${(performance.length ? Math.round(performance.reduce((a,b)=>a+Number(b.on_time_percent||0),0)/performance.length) : 0)}%`} icon="trend" color="secondary" /></Grid>
+        </Grid>
+      </Grid>
+      {/* Analytics Row */}
+      <Grid item xs={12} md={6}>
+        <DashboardCard title="Training Completion" variant="outlined">
+          <PieChart
+            data={(function(){
+              const total = training.length || 0;
+              const completed = training.filter(t => (t.status||'').toLowerCase()==='completed').length;
+              const remaining = Math.max(total - completed, 0);
+              return [
+                { label: 'Completed', value: completed },
+                { label: 'Remaining', value: remaining },
+              ];
+            })()}
+          />
+        </DashboardCard>
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <DashboardCard title="Top Drivers by Trips Completed" variant="outlined">
+          <BarChart
+            data={(performance||[])
+              .map(k => ({ label: String(k.driver_id).slice(0,6), value: Number(k.trips_completed||0) }))
+              .sort((a,b)=>b.value-a.value)
+              .slice(0,10)}
+          />
+        </DashboardCard>
+      </Grid>
       <Grid item xs={12}>
         <DashboardCard title="Drivers" variant="outlined">
           <DataTable

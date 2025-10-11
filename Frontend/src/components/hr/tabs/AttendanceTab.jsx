@@ -9,6 +9,9 @@ export default function AttendanceTab() {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(false);
   const companyId = window.companyId || localStorage.getItem('companyId');
+  const [scheduledShifts, setScheduledShifts] = useState([]);
+  const [editShiftOpen, setEditShiftOpen] = useState(false);
+  const [editingShift, setEditingShift] = useState(null);
   
   // Modal states
   const [showAddAttendance, setShowAddAttendance] = useState(false);
@@ -72,6 +75,19 @@ export default function AttendanceTab() {
       
       setAttendance(transformedAttendance);
       setStaff(staffData || []);
+
+      // Load scheduled shifts if table exists
+      try {
+        const { data: ds } = await supabase
+          .from('driver_shifts')
+          .select('id, driver_id, department, start_time, end_time, repeat, status, created_at')
+          .eq('company_id', companyId)
+          .order('start_time', { ascending: true })
+          .limit(500);
+        setScheduledShifts(ds || []);
+      } catch (e) {
+        setScheduledShifts([]);
+      }
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -110,8 +126,21 @@ export default function AttendanceTab() {
   const handleScheduleShift = async () => {
     try {
       if (!shiftForm.employee || !shiftForm.shiftStartTime || !shiftForm.shiftEndTime) return;
-      // TODO: Implement shift scheduling functionality
-      console.log('Scheduling shift:', shiftForm);
+      // Persist to driver_shifts (if table exists). Fallback: log error silently.
+      const payload = {
+        company_id: companyId,
+        driver_id: shiftForm.employee,
+        department: shiftForm.department || null,
+        start_time: shiftForm.shiftStartTime,
+        end_time: shiftForm.shiftEndTime,
+        repeat: shiftForm.repeat,
+        status: 'Assigned',
+      };
+      try {
+        await supabase.from('driver_shifts').insert([payload]);
+      } catch (e) {
+        console.warn('driver_shifts insert failed; ensure table exists', e?.message || e);
+      }
       setShowScheduleShift(false);
       setShiftForm({
         employee: '',
@@ -120,6 +149,8 @@ export default function AttendanceTab() {
         shiftEndTime: '',
         repeat: 'None'
       });
+      // Reload to reflect changes if driver_shifts also feeds into any views
+      loadData();
     } catch (error) {
       console.error('Error scheduling shift:', error);
     }
@@ -148,6 +179,46 @@ export default function AttendanceTab() {
       alert('Notification functionality to be implemented');
     } catch (error) {
       console.error('Error notifying employee:', error);
+    }
+  };
+
+  // Shift editing helpers
+  const openEditShift = (row) => {
+    try {
+      setEditingShift(row || null);
+      setEditShiftOpen(true);
+    } catch (e) {
+      console.error('Error opening edit shift dialog:', e);
+    }
+  };
+
+  const saveEditShift = async () => {
+    try {
+      if (!editingShift?.id) return;
+      const update = {
+        start_time: editingShift.start_time || null,
+        end_time: editingShift.end_time || null,
+        repeat: editingShift.repeat || null,
+        status: editingShift.status || null,
+      };
+      await supabase.from('driver_shifts').update(update).eq('id', editingShift.id);
+      setEditShiftOpen(false);
+      setEditingShift(null);
+      await loadData();
+    } catch (e) {
+      console.error('Error saving edited shift:', e);
+    }
+  };
+
+  const deleteShift = async (row) => {
+    try {
+      if (!row?.id) return;
+      const ok = window.confirm('Delete this scheduled shift?');
+      if (!ok) return;
+      await supabase.from('driver_shifts').delete().eq('id', row.id);
+      await loadData();
+    } catch (e) {
+      console.error('Error deleting shift:', e);
     }
   };
 
@@ -288,6 +359,59 @@ export default function AttendanceTab() {
           </Grid>
         </CardContent>
       </Card>
+
+      {/* Scheduled Shifts */}
+      <Card sx={{ mt: 3 }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2 }}>Scheduled Shifts</Typography>
+          <DataTable
+            data={scheduledShifts}
+            loading={loading}
+            columns={[
+              { field: 'driver_id', headerName: 'Driver' },
+              { field: 'department', headerName: 'Department' },
+              { field: 'start_time', headerName: 'Start' },
+              { field: 'end_time', headerName: 'End' },
+              { field: 'repeat', headerName: 'Repeat' },
+              { field: 'status', headerName: 'Status' },
+            ]}
+            rowActions={[
+              { label: 'Edit', onClick: ({ row }) => openEditShift(row) },
+              { label: 'Delete', onClick: ({ row }) => deleteShift(row) },
+            ]}
+            searchable
+            pagination
+            emptyMessage="No scheduled shifts found"
+          />
+        </CardContent>
+      </Card>
+
+      {/* Edit Shift Modal */}
+      <Dialog open={editShiftOpen} onClose={() => setEditShiftOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Scheduled Shift</DialogTitle>
+        <DialogContent>
+          {editingShift ? (
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12} sm={6}>
+                <TextField fullWidth label="Start" type="datetime-local" value={editingShift.start_time || ''} onChange={e => setEditingShift(s => ({ ...s, start_time: e.target.value }))} InputLabelProps={{ shrink: true }} />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField fullWidth label="End" type="datetime-local" value={editingShift.end_time || ''} onChange={e => setEditingShift(s => ({ ...s, end_time: e.target.value }))} InputLabelProps={{ shrink: true }} />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField fullWidth label="Repeat" value={editingShift.repeat || ''} onChange={e => setEditingShift(s => ({ ...s, repeat: e.target.value }))} />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField fullWidth label="Status" value={editingShift.status || ''} onChange={e => setEditingShift(s => ({ ...s, status: e.target.value }))} />
+              </Grid>
+            </Grid>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditShiftOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveEditShift}>Save</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Attendance Table */}
       <Card>

@@ -7,7 +7,11 @@ namespace Backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+<<<<<<< HEAD
     [Authorize]
+=======
+    [Authorize(Roles = "developer,admin")]
+>>>>>>> 04b39f5 (Add route schedules and update authentication system)
     public class ApiKeysController : ControllerBase
     {
         private readonly AppDbContext _db;

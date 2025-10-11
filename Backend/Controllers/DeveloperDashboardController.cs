@@ -8,7 +8,11 @@ namespace Backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+<<<<<<< HEAD
     [Authorize(Roles = "developer,admin")] // restrict to developer/admin roles
+=======
+    [Authorize(Roles = "developer")]
+>>>>>>> 04b39f5 (Add route schedules and update authentication system)
     public class DeveloperDashboardController : ControllerBase
     {
         private readonly AppDbContext _context;

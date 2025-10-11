@@ -3,7 +3,7 @@ import { Box, Grid, Card, CardContent, Typography, Button, Chip, Dialog, DialogT
 import { Visibility as ViewIcon, Flag as FlagIcon, Send as SendIcon, Assessment as AssessmentIcon, Download as DownloadIcon, Delete as DeleteIcon, Security as SecurityIcon, Error as ErrorIcon, Warning as WarningIcon, CheckCircle as CheckCircleIcon, Business as BusinessIcon, Person as PersonIcon, DirectionsBus as BusIcon, Receipt as ReceiptIcon, Route as RouteIcon } from '@mui/icons-material';
 import DashboardCard from '../../common/DashboardCard';
 import DataTable from '../../common/DataTable';
-import { getActivityLogGlobal, getCompaniesLight } from '../../../supabase/api';
+import { getActivityLogGlobal, getCompaniesLight, getSystemMetrics } from '../../../supabase/api';
 import { ModernTextField, ModernButton } from '../../common/FormComponents';
 
 function toCSV(rows) {
@@ -49,17 +49,15 @@ export default function MonitoringDevTab() {
   const load = async () => {
     setLoading(true);
     try {
-      const [activityRes, companiesRes] = await Promise.all([
+      const [activityRes, companiesRes, metricsRes] = await Promise.all([
         getActivityLogGlobal(),
-        getCompaniesLight()
+        getCompaniesLight(),
+        getSystemMetrics()
       ]);
       
       setActivityLogs(activityRes.data || []);
       setCompanies(companiesRes.data || []);
-      
-      // TODO: Replace with actual API calls for error logs and system metrics
-      setErrorLogs([]);
-      setSystemMetrics({
+      setSystemMetrics(metricsRes.data || {
         activeCompanies: 0,
         activeBuses: 0,
         bookingsToday: 0,
@@ -69,6 +67,9 @@ export default function MonitoringDevTab() {
         avgResponseTime: 0,
         failedLogins: 0
       });
+      
+      // Error logs can be filtered from activity logs
+      setErrorLogs([]);
     } catch (error) {
       console.error('Error loading data:', error);
     }

@@ -390,6 +390,7 @@ const DataTable = ({
               // Data rows (virtualized slice when enabled)
               effectiveData.rows.map((row, indexRel) => {
                 const index = effectiveData.startIndex + indexRel;
+                return (
                 <TableRow
                   key={index}
                   selected={selected.includes(index)}
@@ -454,6 +455,7 @@ const DataTable = ({
                     </TableCell>
                   )}
                 </TableRow>
+                );
               })
             )}
           </TableBody>
@@ -472,7 +474,7 @@ const DataTable = ({
             setRowsPerPage(parseInt(e.target.value, 10));
             setPage(0);
           }}
-          rowsPerPageOptions={[5, 10, 25, 50]}
+          rowsPerPageOptions={[10, 25, 50, 100]}
           sx={{
             borderTop: `1px solid ${theme.colors.border.light}`,
             '& .MuiTablePagination-toolbar': {

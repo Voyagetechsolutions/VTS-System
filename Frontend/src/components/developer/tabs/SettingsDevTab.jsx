@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Grid, Card, CardContent, Typography, Button, TextField, FormControl, InputLabel, Select, MenuItem, FormControlLabel, Switch, Alert, Tabs, Tab, Chip } from '@mui/material';
 import { Save as SaveIcon, Refresh as RefreshIcon, Business as BusinessIcon, Security as SecurityIcon, Notifications as NotificationsIcon, Assessment as AssessmentIcon, Payment as PaymentIcon, Settings as SettingsIcon } from '@mui/icons-material';
+import { getPlatformSettings, updatePlatformSettings } from '../../../supabase/api';
 
 export default function SettingsDevTab() {
   const [activeTab, setActiveTab] = useState(0);
@@ -26,6 +27,23 @@ export default function SettingsDevTab() {
 
   const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      setLoading(true);
+      try {
+        const { data } = await getPlatformSettings();
+        if (data && Object.keys(data).length > 0) {
+          setSettings(prev => ({ ...prev, ...data }));
+        }
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+      setLoading(false);
+    };
+    loadSettings();
+  }, []);
 
   const handleSettingChange = (field, value) => {
     setSettings(prev => ({ ...prev, [field]: value }));
@@ -35,7 +53,7 @@ export default function SettingsDevTab() {
   const handleSaveSettings = async () => {
     setSaving(true);
     try {
-      console.log('Saving settings:', settings);
+      await updatePlatformSettings(settings);
       setHasChanges(false);
     } catch (error) {
       console.error('Error saving settings:', error);
@@ -44,8 +62,26 @@ export default function SettingsDevTab() {
   };
 
   const handleResetToDefault = () => {
-    console.log('Resetting to default settings...');
-    setHasChanges(false);
+    setSettings({
+      platformName: 'Bus Management System',
+      defaultTimezone: 'Africa/Johannesburg',
+      defaultCurrency: 'ZAR',
+      defaultLanguage: 'en',
+      defaultPlan: 'Basic',
+      defaultTrialPeriod: 30,
+      maxUsersPerCompany: 100,
+      maxBusesPerCompany: 50,
+      commissionPercentage: 5,
+      emailNotifications: true,
+      smsNotifications: false,
+      passwordMinLength: 8,
+      passwordComplexity: true,
+      twoFactorRequired: false,
+      sessionTimeout: 480,
+      logRetentionPeriod: 365,
+      detailedLogging: true
+    });
+    setHasChanges(true);
   };
 
   return (

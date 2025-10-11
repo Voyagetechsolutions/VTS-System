@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Paper, Typography, Stack, TextField, Button, Divider, Table, TableHead, TableRow, TableCell, TableBody, Select, MenuItem } from '@mui/material';
-import { getBranches, createBranch, getCompanyUsers, setUserBranch } from '../../../supabase/api';
+import { getBranches, createBranch, getCompanyUsers, setUserBranch, getCompanySettings } from '../../../supabase/api';
 
 export default function BranchesTab() {
   const [branches, setBranches] = useState([]);
@@ -8,6 +8,7 @@ export default function BranchesTab() {
   const [location, setLocation] = useState('');
   const [users, setUsers] = useState([]);
   const [assign, setAssign] = useState({ user_id: '', branch_id: '' });
+  const [canEdit, setCanEdit] = useState(true);
 
   const load = async () => {
     const [b, u] = await Promise.all([getBranches(), getCompanyUsers()]);
@@ -15,6 +16,7 @@ export default function BranchesTab() {
     setUsers(u.data || []);
   };
   useEffect(() => { load(); }, []);
+  useEffect(() => { (async () => { try { const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole') || 'admin'; const { data } = await getCompanySettings(); setCanEdit(!!(data?.rbac?.[role]?.edit)); } catch { setCanEdit(true); } })(); }, []);
 
   const create = async () => {
     if (!name) return;
@@ -37,7 +39,7 @@ export default function BranchesTab() {
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
           <TextField label="Branch name" value={name} onChange={e => setName(e.target.value)} />
           <TextField label="Location" value={location} onChange={e => setLocation(e.target.value)} />
-          <Button variant="contained" onClick={create}>Create</Button>
+          {canEdit && <Button variant="contained" onClick={create}>Create</Button>}
         </Stack>
         <Divider sx={{ my: 2 }} />
         <Table size="small">
@@ -70,7 +72,7 @@ export default function BranchesTab() {
             <MenuItem value="">Select Branch</MenuItem>
             {(branches||[]).map(b => <MenuItem key={b.branch_id} value={b.branch_id}>{b.name}</MenuItem>)}
           </Select>
-          <Button variant="contained" onClick={assignBranch}>Assign</Button>
+          {canEdit && <Button variant="contained" onClick={assignBranch}>Assign</Button>}
         </Stack>
       </Paper>
     </Box>

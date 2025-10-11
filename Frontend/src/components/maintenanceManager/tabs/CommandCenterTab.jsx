@@ -182,7 +182,7 @@ export default function CommandCenterTab() {
         </Box>
       </Box>
 
-      {/* Live Fleet Map */}
+      {/* Live Fleet Map - Optional, can be toggled */}
       <Card sx={{ mb: 4 }}>
         <CardContent>
           <Typography variant="h6" sx={{ mb: 2 }}>Live Fleet Map</Typography>

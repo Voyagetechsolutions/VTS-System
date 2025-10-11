@@ -32,7 +32,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Schedule as ScheduleIcon,
   LocalGasStation as FuelIcon,
-  Recycling as RecycleIcon,
+  Loop as RecycleIcon,
   Notifications as NotificationsIcon
 } from '@mui/icons-material';
 import { supabase } from '../../../supabase/client';

@@ -10,14 +10,22 @@ import Inventory2Icon from '@mui/icons-material/Inventory2';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import { formatCurrency, formatNumber } from '../../../utils/formatters';
-import { getAdminOversightSnapshot } from '../../../supabase/api';
+import { getAdminOversightSnapshot, getOpsSnapshotFromViews } from '../../../supabase/api';
 
 export default function OversightMapTab() {
   const [snapshot, setSnapshot] = useState(null);
 
   useEffect(() => {
     const load = async () => {
-      const { data } = await getAdminOversightSnapshot();
+      let data = null;
+      try {
+        const res = await getOpsSnapshotFromViews();
+        data = res.data || null;
+      } catch {}
+      if (!data) {
+        const fallback = await getAdminOversightSnapshot();
+        data = fallback.data || null;
+      }
       setSnapshot(data);
     };
     load();
@@ -27,12 +35,12 @@ export default function OversightMapTab() {
 
   if (!snapshot) return <Typography>Loading oversight...</Typography>;
 
-  const Section = ({ title, icon, children, kpi }) => (
-    <Card>
+  const Section = ({ title, icon, children, kpi, intent = 'default' }) => (
+    <Card sx={{ borderLeft: 4, borderLeftColor: intent === 'danger' ? 'error.main' : intent === 'warning' ? 'warning.main' : 'primary.main' }}>
       <CardContent>
         <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
           <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>{icon}{title}</Typography>
-          {kpi != null && <Chip label={kpi} color="primary" size="small" />}
+          {kpi != null && <Chip label={kpi} color={intent === 'danger' ? 'error' : intent === 'warning' ? 'warning' : 'primary'} size="small" />}
         </Stack>
         <Divider sx={{ my: 2 }} />
         {children}
@@ -46,7 +54,12 @@ export default function OversightMapTab() {
       <Grid container spacing={3}>
         {/* 1. Booking Office */}
         <Grid item xs={12} md={6}>
-          <Section title="Booking Office" icon={<ConfirmationNumberIcon color="primary" />} kpi={`Vol: ${formatNumber(snapshot.booking.volumeToday)} • Fraud: ${snapshot.booking.fraudAlerts}`}>
+          <Section
+            title="Booking Office"
+            icon={<ConfirmationNumberIcon color="primary" />}
+            kpi={`Vol: ${formatNumber(snapshot.booking.volumeToday)} • Fraud: ${snapshot.booking.fraudAlerts}`}
+            intent={snapshot.booking.fraudAlerts > 0 ? 'warning' : 'default'}
+          >
             <List dense>
               <ListItem>
                 <ListItemText primary={`Refund approvals pending: ${snapshot.booking.largeRefundsPending}`} secondary="Admin approves large/policy-exception refunds" />
@@ -63,7 +76,12 @@ export default function OversightMapTab() {
 
         {/* 2. Boarding Operator */}
         <Grid item xs={12} md={6}>
-          <Section title="Boarding" icon={<PeopleIcon color="primary" />} kpi={`Seat Util: ${snapshot.boarding.seatUtilizationPct}%`}>
+          <Section
+            title="Boarding"
+            icon={<PeopleIcon color="primary" />}
+            kpi={`Seat Util: ${snapshot.boarding.seatUtilizationPct}%`}
+            intent={snapshot.boarding.delays > 5 ? 'warning' : 'default'}
+          >
             <List dense>
               <ListItem>
                 <ListItemText primary={`Incident notifications: ${snapshot.boarding.incidentsToday}`} secondary="Denied boarding, disputes" />
@@ -77,7 +95,12 @@ export default function OversightMapTab() {
 
         {/* 3. Driver */}
         <Grid item xs={12} md={6}>
-          <Section title="Driver" icon={<DirectionsBusFilledIcon color="primary" />} kpi={`Completion: ${snapshot.driver.completionRate}%`}>
+          <Section
+            title="Driver"
+            icon={<DirectionsBusFilledIcon color="primary" />}
+            kpi={`Completion: ${snapshot.driver.completionRate}%`}
+            intent={snapshot.driver.accidents > 0 ? 'danger' : 'default'}
+          >
             <List dense>
               <ListItem>
                 <ListItemText primary={`Accidents: ${snapshot.driver.accidents}`} secondary="Safety violations escalated" />
@@ -94,7 +117,12 @@ export default function OversightMapTab() {
 
         {/* 4. Operations Manager */}
         <Grid item xs={12} md={6}>
-          <Section title="Operations" icon={<AssessmentIcon color="primary" />} kpi={`Utilization: ${snapshot.ops.utilizationPct}%`}>
+          <Section
+            title="Operations"
+            icon={<AssessmentIcon color="primary" />}
+            kpi={`Utilization: ${snapshot.ops.utilizationPct}%`}
+            intent={snapshot.ops.utilizationPct < 60 ? 'warning' : 'default'}
+          >
             <List dense>
               <ListItem>
                 <ListItemText primary={`Pending route approvals: ${snapshot.ops.routeApprovals}`} secondary="Create/modify/suspend routes" />
@@ -108,7 +136,12 @@ export default function OversightMapTab() {
 
         {/* 5. Depot Manager */}
         <Grid item xs={12} md={6}>
-          <Section title="Depot" icon={<Inventory2Icon color="primary" />} kpi={`Readiness: ${snapshot.depot.readinessPct}%`}>
+          <Section
+            title="Depot"
+            icon={<Inventory2Icon color="primary" />}
+            kpi={`Readiness: ${snapshot.depot.readinessPct}%`}
+            intent={snapshot.depot.busesDown > 0 ? 'warning' : 'default'}
+          >
             <List dense>
               <ListItem>
                 <ListItemText primary={`Staff shortages: ${snapshot.depot.staffShortages}`} secondary="Overtime & shift gaps" />
@@ -122,7 +155,12 @@ export default function OversightMapTab() {
 
         {/* 6. Maintenance */}
         <Grid item xs={12} md={6}>
-          <Section title="Maintenance" icon={<EngineeringIcon color="primary" />} kpi={`Downtime: ${snapshot.maintenance.downtimePct}%`}>
+          <Section
+            title="Maintenance"
+            icon={<EngineeringIcon color="primary" />}
+            kpi={`Downtime: ${snapshot.maintenance.downtimePct}%`}
+            intent={snapshot.maintenance.downtimePct > 20 ? 'danger' : snapshot.maintenance.majorApprovals > 0 ? 'warning' : 'default'}
+          >
             <List dense>
               <ListItem>
                 <ListItemText primary={`Major jobs pending approval: ${snapshot.maintenance.majorApprovals}`} secondary="Vendor contracts & budgets" />
@@ -136,7 +174,12 @@ export default function OversightMapTab() {
 
         {/* 7. Finance */}
         <Grid item xs={12} md={6}>
-          <Section title="Finance" icon={<PaymentsIcon color="primary" />} kpi={`P&L: ${formatCurrency(snapshot.finance.pnlMonth)}`}>
+          <Section
+            title="Finance"
+            icon={<PaymentsIcon color="primary" />}
+            kpi={`P&L: ${formatCurrency(snapshot.finance.pnlMonth)}`}
+            intent={snapshot.finance.highRiskRefunds > 0 ? 'warning' : 'default'}
+          >
             <List dense>
               <ListItem>
                 <ListItemText primary={`High-risk refunds: ${snapshot.finance.highRiskRefunds}`} secondary="Escalations to Admin" />
@@ -150,7 +193,12 @@ export default function OversightMapTab() {
 
         {/* 8. HR */}
         <Grid item xs={12} md={6}>
-          <Section title="HR" icon={<PeopleIcon color="primary" />} kpi={`Turnover: ${snapshot.hr.turnoverRate}%`}>
+          <Section
+            title="HR"
+            icon={<PeopleIcon color="primary" />}
+            kpi={`Turnover: ${snapshot.hr.turnoverRate}%`}
+            intent={snapshot.hr.turnoverRate > 10 ? 'warning' : 'default'}
+          >
             <List dense>
               <ListItem>
                 <ListItemText primary={`Critical hires pending: ${snapshot.hr.criticalHires}`} secondary="Drivers, depot managers" />
@@ -164,7 +212,12 @@ export default function OversightMapTab() {
 
         {/* 9. Notifications */}
         <Grid item xs={12} md={6}>
-          <Section title="Notifications" icon={<NotificationsIcon color="primary" />} kpi={`Escalations: ${snapshot.alerts.escalationsToday}`}>
+          <Section
+            title="Notifications"
+            icon={<NotificationsIcon color="primary" />}
+            kpi={`Escalations: ${snapshot.alerts.escalationsToday}`}
+            intent={snapshot.alerts.escalationsToday > 0 ? 'warning' : 'default'}
+          >
             <List dense>
               <ListItem>
                 <ListItemText primary={`Broadcasts sent: ${snapshot.alerts.broadcasts}`} secondary="Urgent / policy updates" />

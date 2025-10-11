@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { ThemeProvider, CssBaseline, IconButton, TextField, Button, Stack, AppBar, Toolbar, Typography, Box } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import api from './utils/apiClient';
@@ -131,29 +131,34 @@ function App() {
       <CssBaseline />
       <SnackbarProvider maxSnack={3} autoHideDuration={3000} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
         <ErrorBoundary>
-          <Router>
-            <TopBar />
-            <Toolbar />
-            <Box sx={{ px: 0 }}>
-            <Suspense fallback={null}>
-            <Routes>
-              <Route path="/" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/developer-dashboard" element={<DeveloperDashboard />} />
-              <Route path="/admin-dashboard" element={<CompanyAdminDashboard />} />
-              <Route path="/ops-dashboard" element={<OperationsManagerDashboard />} />
-              <Route path="/booking-dashboard" element={<BookingOfficeDashboard />} />
-              <Route path="/boarding-operator-dashboard" element={<BoardingOperatorDashboard />} />
-              <Route path="/driver-dashboard" element={<DriverDashboard />} />
-              <Route path="/depot-dashboard" element={<DepotManagerDashboard />} />
-              <Route path="/maintenance-dashboard" element={<MaintenanceManagerDashboard />} />
-              <Route path="/finance-dashboard" element={<FinanceDashboard />} />
-              <Route path="/hr-dashboard" element={<HRDashboard />} />
-              <Route path="/fleet-tracking" element={<FleetTracking />} />
-            </Routes>
-            </Suspense>
-            </Box>
-          </Router>
+          {(() => {
+            const router = createBrowserRouter([
+              { path: '/', element: <Login /> },
+              { path: '/signup', element: <Signup /> },
+              { path: '/developer-dashboard', element: <DeveloperDashboard /> },
+              { path: '/admin-dashboard', element: <CompanyAdminDashboard /> },
+              { path: '/ops-dashboard', element: <OperationsManagerDashboard /> },
+              { path: '/booking-dashboard', element: <BookingOfficeDashboard /> },
+              { path: '/boarding-operator-dashboard', element: <BoardingOperatorDashboard /> },
+              { path: '/driver-dashboard', element: <DriverDashboard /> },
+              { path: '/depot-dashboard', element: <DepotManagerDashboard /> },
+              { path: '/maintenance-dashboard', element: <MaintenanceManagerDashboard /> },
+              { path: '/finance-dashboard', element: <FinanceDashboard /> },
+              { path: '/hr-dashboard', element: <HRDashboard /> },
+              { path: '/fleet-tracking', element: <FleetTracking /> },
+            ]);
+            return (
+              <>
+                <TopBar />
+                <Toolbar />
+                <Box sx={{ px: 0 }}>
+                  <Suspense fallback={null}>
+                    <RouterProvider router={router} future={{ v7_startTransition: true, v7_relativeSplatPath: true }} />
+                  </Suspense>
+                </Box>
+              </>
+            );
+          })()}
         </ErrorBoundary>
       </SnackbarProvider>
     </ThemeProvider>

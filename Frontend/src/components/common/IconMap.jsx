@@ -184,6 +184,7 @@ export const iconMap = {
   support: SupportIcon,
   help: HelpIcon,
   announcements: AnnouncementIcon,
+  announcement: AnnouncementIcon,
   communications: ChatIcon,
   
   // Financial
@@ -227,6 +228,8 @@ export const iconMap = {
   
   // Actions
   add: AddIcon,
+  approval: CheckCircleIcon,
+  route_add: AddIcon,
   edit: EditIcon,
   delete: DeleteIcon,
   save: SaveIcon,
@@ -248,6 +251,7 @@ export const iconMap = {
   compliance: ComplianceIcon,
   safety: SafetyIcon,
   incidents: IncidentIcon,
+  incident: IncidentIcon,
   policy: PolicyIcon,
   
   // System & Technical

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Table, TableHead, TableRow, TableCell, TableBody, TablePagination, Button, TextField, Select, MenuItem, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Stack, Divider, Chip, Tooltip, Box } from '@mui/material';
-import { getCompanyUsers, createUser, updateUser, deleteUser, getBranches } from '../../../database';
+import { getCompanyUsers, createUser, updateUser, deleteUser, getBranches, getCompanySettings } from '../../../supabase/api';
 import { requireString, requireEmail } from '../../../utils/validation';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -16,6 +16,7 @@ export default function UsersTab() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ name: '', email: '', role: 'driver', is_active: true, password_hash: '', branch_id: '' });
   const [branches, setBranches] = useState([]);
+  const [canEdit, setCanEdit] = useState(true);
   const [empOpen, setEmpOpen] = useState(false);
   const [empForm, setEmpForm] = useState({
     full_name: '', id_passport: '', address: '', phone: '', emergency_contact: { name: '', relation: '', phone: '' },
@@ -30,6 +31,7 @@ export default function UsersTab() {
   useEffect(() => {
     getCompanyUsers().then(({ data }) => setUsers(data || []));
     getBranches().then(({ data }) => setBranches(data || []));
+    (async () => { try { const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole') || 'admin'; const { data } = await getCompanySettings(); setCanEdit(!!(data?.rbac?.[role]?.edit)); } catch { setCanEdit(true); } })();
   }, []);
 
   const loadVerification = async () => {
@@ -133,7 +135,7 @@ export default function UsersTab() {
           <MenuItem value="ops_manager">Operations Manager</MenuItem>
           <MenuItem value="admin">Admin</MenuItem>
         </Select>
-        <Button variant="contained" color="primary" onClick={openNew}>Add User</Button>
+        {canEdit && <Button variant="contained" color="primary" onClick={openNew}>Add User</Button>}
         <Button variant="outlined" onClick={exportCSV}>Export CSV</Button>
       </Box>
       <Table>
@@ -165,9 +167,9 @@ export default function UsersTab() {
               <TableCell>{u.branch_id || '-'}</TableCell>
               <TableCell>{u.is_active ? 'Active' : 'Inactive'}</TableCell>
               <TableCell>
-                <Button size="small" variant="outlined" onClick={() => openEmployee(u)}>Actions</Button>
-                <IconButton onClick={() => openEdit(u)}><EditIcon /></IconButton>
-                {!u.email_confirmed_at && (
+                {canEdit && <Button size="small" variant="outlined" onClick={() => openEmployee(u)}>Actions</Button>}
+                {canEdit && <IconButton onClick={() => openEdit(u)}><EditIcon /></IconButton>}
+                {!u.email_confirmed_at && canEdit && (
                   <Button size="small" onClick={async () => {
                     try {
                       const url = `${process.env.REACT_APP_SUPABASE_URL || ''}/functions/v1/admin_resend_invite`;
@@ -175,7 +177,7 @@ export default function UsersTab() {
                     } catch {}
                   }}>Resend invite</Button>
                 )}
-                <IconButton onClick={async () => { await deleteUser(u.user_id); try { await window.supabase.from('activity_log').insert([{ company_id: window.companyId, type: 'user_delete', message: JSON.stringify({ user_id: u.user_id, by: window.userId }) }]); } catch {} getCompanyUsers().then(({ data }) => setUsers(data || [])); }}><DeleteIcon /></IconButton>
+                {canEdit && <IconButton onClick={async () => { await deleteUser(u.user_id); try { await window.supabase.from('activity_log').insert([{ company_id: window.companyId, type: 'user_delete', message: JSON.stringify({ user_id: u.user_id, by: window.userId }) }]); } catch {} getCompanyUsers().then(({ data }) => setUsers(data || [])); }}><DeleteIcon /></IconButton>}
               </TableCell>
             </TableRow>
           ))}
@@ -212,7 +214,7 @@ export default function UsersTab() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={save}>Save</Button>
+          {canEdit && <Button variant="contained" onClick={save}>Save</Button>}
         </DialogActions>
       </Dialog>
 
@@ -280,8 +282,8 @@ export default function UsersTab() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEmpOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={saveEmployee}>Save</Button>
+          <Button onClick={() => setEmpOpen(false)}>Close</Button>
+          {canEdit && <Button variant="contained" onClick={saveEmployee}>Save</Button>}
         </DialogActions>
       </Dialog>
     </>

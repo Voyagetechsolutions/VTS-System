@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Paper, Typography, Stack, Button, Divider, List, ListItem, ListItemText, Select, MenuItem, TextField } from '@mui/material';
+import { Box, Paper, Typography, Stack, Button, Divider, List, ListItem, ListItemText, Select, MenuItem, TextField, Link } from '@mui/material';
 import { supabase } from '../../supabase/client';
-import { getDriverDocuments, uploadDriverDocument } from '../../supabase/api';
 import { subscribeToDocuments } from '../../supabase/realtime';
 
 export default function DocumentsTab() {
@@ -11,8 +10,31 @@ export default function DocumentsTab() {
   const [name, setName] = useState('');
 
   const load = async () => {
-    const r = await getDriverDocuments();
-    setDocs(r.data || []);
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('company_id', window.companyId)
+        .order('uploaded_at', { ascending: false });
+      if (error) throw error;
+      // attach signed URLs for quick view/download
+      const withUrls = await Promise.all((data || []).map(async (d) => {
+        try {
+          const filePath = d.file_path || d.url; // tolerate both columns
+          if (!filePath) return d;
+          const { data: signed } = await supabase.storage
+            .from('documents')
+            .createSignedUrl(String(filePath), 3600);
+          return { ...d, signed_url: signed?.signedUrl || null };
+        } catch {
+          return { ...d, signed_url: null };
+        }
+      }));
+      setDocs(withUrls);
+    } catch (e) {
+      console.error('Load documents failed', e);
+      setDocs([]);
+    }
   };
   useEffect(() => { load(); }, []);
   useEffect(() => {
@@ -22,15 +44,34 @@ export default function DocumentsTab() {
 
   const onUpload = async () => {
     if (!file) return;
-    // store file and metadata
-    const path = `docs/${category}/${Date.now()}_${file.name}`;
+    const path = `${window.userId || 'unknown'}/${Date.now()}_${file.name}`;
     try {
-      const { data, error } = await supabase.storage.from('documents').upload(path, file, { upsert: true });
-      if (!error) {
-        await uploadDriverDocument(file); // backward compatibility if used elsewhere
-        await supabase.from('documents').insert([{ company_id: window.companyId, category, name: name || file.name, url: data?.path || path, expires_at: null }]);
-      }
-    } catch {}
+      // Upload to documents bucket with proper contentType
+      const { data: up, error: upErr } = await supabase.storage
+        .from('documents')
+        .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type });
+      if (upErr) throw upErr;
+      // Insert a row into documents table for tracking
+      const row = {
+        title: name || file.name,
+        type: category,
+        description: name || '',
+        file_path: up?.path || path,
+        file_name: file.name,
+        file_size: file.size,
+        mime_type: file.type,
+        expiry_date: null,
+        status: 'Active',
+        user_id: window.userId || null,
+        company_id: window.companyId,
+        uploaded_at: new Date().toISOString(),
+        uploaded_by: window.userId || null,
+      };
+      const { error: insErr } = await supabase.from('documents').insert([row]);
+      if (insErr) throw insErr;
+    } catch (e) {
+      console.error('Upload failed', e);
+    }
     setFile(null);
     setName('');
     load();
@@ -54,8 +95,20 @@ export default function DocumentsTab() {
         <Divider sx={{ my: 2 }} />
         <List dense>
           {(docs || []).map((d, idx) => (
-            <ListItem key={d.id || idx}>
-              <ListItemText primary={`${d.category || 'General'} · ${d.name || 'Document'}`} secondary={d.expires_at ? `Expires: ${new Date(d.expires_at).toLocaleDateString()}` : (d.url || d.created_at)} />
+            <ListItem key={d.document_id || d.id || idx} secondaryAction={
+              d.signed_url ? (
+                <Stack direction="row" spacing={1}>
+                  <Button size="small" variant="outlined" onClick={() => window.open(d.signed_url, '_blank')}>View</Button>
+                  <Link href={d.signed_url} download target="_blank" rel="noopener">
+                    <Button size="small" variant="contained">Download</Button>
+                  </Link>
+                </Stack>
+              ) : null
+            }>
+              <ListItemText
+                primary={`${(d.type || d.category || 'General')} · ${(d.title || d.name || d.file_name || 'Document')}`}
+                secondary={d.expiry_date ? `Expires: ${new Date(d.expiry_date).toLocaleDateString()}` : (d.uploaded_at || d.created_at)}
+              />
             </ListItem>
           ))}
         </List>
