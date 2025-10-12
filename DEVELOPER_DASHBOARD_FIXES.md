@@ -273,7 +273,8 @@ All Developer Dashboard tabs are now:
 
 ## Database Setup Required
 
-Run these SQL scripts in order on your Supabase instance:
-1. `Database/016_create_subscriptions_table.sql` - Creates subscriptions table and test data
+Run these SQL scripts **in order** on your Supabase instance:
+1. `Database/017_fix_subscriptions_schema.sql` - Creates subscriptions table with correct schema
+2. `Database/018_fix_platform_settings_and_announcements.sql` - Fixes platform_settings and announcements tables
 
 The app is now ready for production use!

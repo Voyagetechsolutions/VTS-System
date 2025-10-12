@@ -2,10 +2,10 @@
 
 ## Quick Start
 
-To set up the Developer Dashboard with all features working, run these SQL scripts in your Supabase SQL Editor in order:
+To set up the Developer Dashboard with all features working, run these SQL scripts in your Supabase SQL Editor **in order**:
 
-### 1. Create Subscriptions Table
-**File:** `016_create_subscriptions_table.sql`
+### 1. Fix Subscriptions Table Schema
+**File:** `Database/017_fix_subscriptions_schema.sql` ⚠️ **RUN THIS FIRST**
 
 This script will:
 - Create the `subscriptions` table
@@ -16,16 +16,32 @@ This script will:
 
 **How to run:**
 1. Open Supabase Dashboard → SQL Editor
-2. Copy the contents of `016_create_subscriptions_table.sql`
+2. Copy the contents of `017_fix_subscriptions_schema.sql`
 3. Paste and click "Run"
 4. Verify: You should see "Success. No rows returned" or similar
 
-### 2. Verify Data
+### 2. Fix Platform Settings and Announcements
+**File:** `018_fix_platform_settings_and_announcements.sql` ⚠️ **RUN THIS SECOND**
+
+This script will:
+- Create the `platform_settings` table with correct schema
+- Add default platform settings
+- Add missing columns to `announcements` table (`created_by`, `status`, `sent_at`, etc.)
+- Create RLS policies for both tables
+
+**How to run:**
+1. Open Supabase Dashboard → SQL Editor
+2. Copy the contents of `018_fix_platform_settings_and_announcements.sql`
+3. Paste and click "Run"
+4. Verify: You should see "Success. No rows returned" or similar
+
+### 3. Verify Data
 
 Run this query to check if subscriptions were created:
 
 ```sql
 SELECT 
+  s.id,
   s.subscription_id,
   c.name as company_name,
   s.plan,
