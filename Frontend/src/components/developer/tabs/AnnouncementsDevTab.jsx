@@ -57,13 +57,18 @@ export default function AnnouncementsDevTab() {
 
   const handleCreateAnnouncement = async () => {
     try {
-      await createAnnouncement({
+      const result = await createAnnouncement({
         title: newAnnouncement.title,
         message: newAnnouncement.message,
         target_audience: newAnnouncement.targetAudience,
         delivery_method: newAnnouncement.deliveryMethod,
         priority: newAnnouncement.priority
       });
+      if (result.error) {
+        alert('Error creating announcement: ' + result.error.message);
+        return;
+      }
+      alert('Announcement created successfully!');
       setShowCreateAnnouncement(false);
       setNewAnnouncement({
         title: '',
@@ -77,6 +82,7 @@ export default function AnnouncementsDevTab() {
       load();
     } catch (error) {
       console.error('Error creating announcement:', error);
+      alert('Failed to create announcement: ' + error.message);
     }
   };
 
@@ -87,10 +93,16 @@ export default function AnnouncementsDevTab() {
 
   const handleSendAnnouncement = async (announcementId) => {
     try {
-      await sendAnnouncement(announcementId);
+      const result = await sendAnnouncement(announcementId);
+      if (result.error) {
+        alert('Error sending announcement: ' + result.error.message);
+        return;
+      }
+      alert('Announcement sent successfully!');
       load();
     } catch (error) {
       console.error('Error sending announcement:', error);
+      alert('Failed to send announcement: ' + error.message);
     }
   };
 

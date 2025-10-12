@@ -3,7 +3,7 @@ import { Box, Grid, Card, CardContent, Typography, Button, Chip, Dialog, DialogT
 import { Visibility as ViewIcon, Flag as FlagIcon, Send as SendIcon, Assessment as AssessmentIcon, Receipt as ReceiptIcon, Person as PersonIcon, Business as BusinessIcon, Route as RouteIcon, CreditCard as CreditCardIcon, CheckCircle as CheckCircleIcon, Cancel as CancelIcon, Pending as PendingIcon, Warning as WarningIcon } from '@mui/icons-material';
 import DashboardCard from '../../common/DashboardCard';
 import DataTable from '../../common/DataTable';
-import { getCompaniesLight } from '../../../supabase/api';
+import { getAllCompaniesGlobal, getAllBookingsGlobal, getPaymentsGlobal } from '../../../supabase/api';
 
 function toCSV(rows) {
   if (!rows?.length) return '';
@@ -51,15 +51,32 @@ export default function BookingsDevTab() {
   const load = async () => {
     setLoading(true);
     try {
-      const companiesRes = await getCompaniesLight();
-      setCompanies(companiesRes.data || []);
-      // Clear mock data: initialize with empty datasets and zeroed analytics
-      setBookings([]);
-      setTransactions([]);
+      const [companiesRes, bookingsRes, paymentsRes] = await Promise.all([
+        getAllCompaniesGlobal(),
+        getAllBookingsGlobal({}),
+        getPaymentsGlobal({})
+      ]);
+      
+      const companiesData = companiesRes.data || [];
+      const bookingsData = bookingsRes.data || [];
+      const paymentsData = paymentsRes.data || [];
+      
+      setCompanies(companiesData);
+      setBookings(bookingsData);
+      setTransactions(paymentsData);
+      
+      // Calculate analytics
+      const totalRevenue = paymentsData
+        .filter(p => p.status === 'completed')
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
+      
+      const failedCount = paymentsData.filter(p => p.status === 'failed').length;
+      
       setAnalytics({
-        totalBookings: 0,
-        totalRevenue: 0,
-        failedTransactions: 0,
+        totalBookings: bookingsData.length,
+        totalRevenue: totalRevenue,
+        failedTransactions: failedCount,
+        failureRate: paymentsData.length > 0 ? ((failedCount / paymentsData.length) * 100).toFixed(1) : 0,
         topRoutes: []
       });
     } catch (error) {
@@ -72,25 +89,23 @@ export default function BookingsDevTab() {
 
   const filteredBookings = bookings.filter(booking => (
     (bookingSearch ? 
-      booking.id.toLowerCase().includes(bookingSearch.toLowerCase()) ||
-      booking.passengerName.toLowerCase().includes(bookingSearch.toLowerCase()) ||
-      booking.passengerEmail.toLowerCase().includes(bookingSearch.toLowerCase())
+      booking.booking_id?.toLowerCase().includes(bookingSearch.toLowerCase()) ||
+      booking.passenger_name?.toLowerCase().includes(bookingSearch.toLowerCase()) ||
+      booking.contact_email?.toLowerCase().includes(bookingSearch.toLowerCase())
       : true) &&
-    (bookingCompany ? booking.companyId === bookingCompany : true) &&
     (bookingStatus ? booking.status === bookingStatus : true) &&
-    (bookingDateFrom ? new Date(booking.bookingDate) >= new Date(bookingDateFrom) : true) &&
-    (bookingDateTo ? new Date(booking.bookingDate) <= new Date(bookingDateTo) : true)
+    (bookingDateFrom ? new Date(booking.booking_date) >= new Date(bookingDateFrom) : true) &&
+    (bookingDateTo ? new Date(booking.booking_date) <= new Date(bookingDateTo) : true)
   ));
 
   const filteredTransactions = transactions.filter(transaction => (
     (transactionSearch ? 
-      transaction.id.toLowerCase().includes(transactionSearch.toLowerCase()) ||
-      transaction.bookingId.toLowerCase().includes(transactionSearch.toLowerCase())
+      transaction.transaction_id?.toLowerCase().includes(transactionSearch.toLowerCase()) ||
+      transaction.booking_id?.toLowerCase().includes(transactionSearch.toLowerCase())
       : true) &&
-    (transactionCompany ? transaction.companyId === transactionCompany : true) &&
     (paymentStatus ? transaction.status === paymentStatus : true) &&
-    (transactionDateFrom ? new Date(transaction.transactionDate) >= new Date(transactionDateFrom) : true) &&
-    (transactionDateTo ? new Date(transaction.transactionDate) <= new Date(transactionDateTo) : true)
+    (transactionDateFrom ? new Date(transaction.paid_at) >= new Date(transactionDateFrom) : true) &&
+    (transactionDateTo ? new Date(transaction.paid_at) <= new Date(transactionDateTo) : true)
   ));
 
   const handleViewBooking = (booking) => {

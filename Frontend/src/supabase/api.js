@@ -972,24 +972,34 @@ export async function deactivateUserGlobal(user_id) {
 
 // Developer: Bookings & Transactions
 export async function getAllBookingsGlobal({ from, to } = {}) {
-  let q = supabase.from('bookings').select('booking_id, trip_id, status, booking_date, amount, company_id');
+  let q = supabase.from('bookings').select('booking_id, passenger_name, contact_email, contact_phone, status, payment_status, booking_date');
   if (from) q = q.gte('booking_date', from);
   if (to) q = q.lte('booking_date', to);
-  return q;
+  return q.order('booking_date', { ascending: false });
 }
 export async function getPaymentsGlobal({ from, to } = {}) {
-  let q = supabase.from('payments').select('payment_id, booking_id, amount, status, created_at, company_id');
-  if (from) q = q.gte('created_at', from);
-  if (to) q = q.lte('created_at', to);
-  return q;
+  let q = supabase.from('payments').select('transaction_id, booking_id, amount, payment_method, status, paid_at');
+  if (from) q = q.gte('paid_at', from);
+  if (to) q = q.lte('paid_at', to);
+  return q.order('paid_at', { ascending: false });
 }
 
 // Developer: Billing & Subscriptions
-// export async function getSubscriptions() { DUPLICATE REMOVED }
-export async function updateSubscription(id, updates) {
-  return supabase.from('subscriptions').update(updates).eq('id', id);
+export async function getAllSubscriptionsGlobal() {
+  return supabase
+    .from('subscriptions')
+    .select('subscription_id, company_id, plan, status, start_date, end_date, amount, companies(company_id, name, is_active)')
+    .order('start_date', { ascending: false });
 }
-// export async function getInvoices() { DUPLICATE REMOVED }
+export async function updateSubscription(id, updates) {
+  return supabase.from('subscriptions').update(updates).eq('subscription_id', id);
+}
+export async function suspendCompanyGlobal(company_id) {
+  return supabase.from('companies').update({ is_active: false }).eq('company_id', company_id);
+}
+export async function activateCompanyGlobal(company_id) {
+  return supabase.from('companies').update({ is_active: true }).eq('company_id', company_id);
+}
 
 // Developer: Monitoring & Logs (using activity_log)
 export async function getActivityLogGlobal({ type } = {}) {

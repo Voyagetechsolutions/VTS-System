@@ -3,7 +3,7 @@ import { Box, Grid, Card, CardContent, Typography, Button, Chip, Dialog, DialogT
 import { Add as AddIcon, Visibility as ViewIcon, Edit as EditIcon, Send as SendIcon, Payment as PaymentIcon, Business as BusinessIcon, MonetizationOn as MonetizationOnIcon, Warning as WarningIcon, CheckCircle as CheckCircleIcon, Schedule as ScheduleIcon } from '@mui/icons-material';
 import DashboardCard from '../../common/DashboardCard';
 import DataTable from '../../common/DataTable';
-import { getSubscriptions, updateSubscription, getInvoices, getCompaniesLight } from '../../../supabase/api';
+import { getAllSubscriptionsGlobal, updateSubscription, getPaymentsGlobal, getAllCompaniesGlobal, suspendCompanyGlobal, activateCompanyGlobal } from '../../../supabase/api';
 
 export default function BillingDevTab() {
   const [subs, setSubs] = useState([]);
@@ -24,10 +24,18 @@ export default function BillingDevTab() {
 
   const load = async () => {
     setLoading(true);
-    const [s, i, c] = await Promise.all([getSubscriptions(), getInvoices(), getCompaniesLight()]);
-    setSubs(s.data || []);
-    setInvoices(i.data || []);
-    setCompanies(c.data || []);
+    try {
+      const [s, i, c] = await Promise.all([
+        getAllSubscriptionsGlobal(), 
+        getPaymentsGlobal({}), 
+        getAllCompaniesGlobal()
+      ]);
+      setSubs(s.data || []);
+      setInvoices(i.data || []);
+      setCompanies(c.data || []);
+    } catch (error) {
+      console.error('Error loading billing data:', error);
+    }
     setLoading(false);
   };
 
@@ -87,6 +95,29 @@ export default function BillingDevTab() {
     }
   };
 
+  const handleSuspendCompany = async (company_id) => {
+    if (!window.confirm('Are you sure you want to suspend this company? All users will lose access.')) return;
+    try {
+      await suspendCompanyGlobal(company_id);
+      alert('Company suspended successfully');
+      load();
+    } catch (error) {
+      console.error('Error suspending company:', error);
+      alert('Failed to suspend company');
+    }
+  };
+
+  const handleActivateCompany = async (company_id) => {
+    try {
+      await activateCompanyGlobal(company_id);
+      alert('Company activated successfully');
+      load();
+    } catch (error) {
+      console.error('Error activating company:', error);
+      alert('Failed to activate company');
+    }
+  };
+
   const actions = [
     { 
       label: 'View', 
@@ -98,13 +129,31 @@ export default function BillingDevTab() {
       color: 'primary'
     },
     { 
-      label: 'Change Plan', 
-      icon: <EditIcon />, 
+      label: 'Suspend Company', 
+      icon: <WarningIcon />, 
       onClick: async ({ row }) => { 
-        // TODO: Implement change plan functionality
-        console.log('Change plan for:', row);
+        const company = companies.find(c => c.company_id === row.company_id);
+        if (company?.is_active) {
+          await handleSuspendCompany(row.company_id);
+        }
       },
-      color: 'info'
+      color: 'error',
+      show: ({ row }) => {
+        const company = companies.find(c => c.company_id === row.company_id);
+        return company?.is_active === true;
+      }
+    },
+    { 
+      label: 'Activate Company', 
+      icon: <CheckCircleIcon />, 
+      onClick: async ({ row }) => { 
+        await handleActivateCompany(row.company_id);
+      },
+      color: 'success',
+      show: ({ row }) => {
+        const company = companies.find(c => c.company_id === row.company_id);
+        return company?.is_active === false;
+      }
     },
     { 
       label: 'Send Reminder', 
@@ -119,7 +168,7 @@ export default function BillingDevTab() {
       label: 'Mark Paid', 
       icon: <PaymentIcon />, 
       onClick: async ({ row }) => { 
-        await handleMarkPaid(row.id);
+        await handleMarkPaid(row.subscription_id);
       },
       color: 'success'
     },

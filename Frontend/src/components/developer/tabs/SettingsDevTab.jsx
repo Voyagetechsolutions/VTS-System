@@ -53,10 +53,16 @@ export default function SettingsDevTab() {
   const handleSaveSettings = async () => {
     setSaving(true);
     try {
-      await updatePlatformSettings(settings);
-      setHasChanges(false);
+      const result = await updatePlatformSettings(settings);
+      if (result.error) {
+        alert('Error saving settings: ' + result.error.message);
+      } else {
+        alert('Settings saved successfully!');
+        setHasChanges(false);
+      }
     } catch (error) {
       console.error('Error saving settings:', error);
+      alert('Failed to save settings: ' + error.message);
     }
     setSaving(false);
   };
