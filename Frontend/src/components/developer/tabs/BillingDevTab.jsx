@@ -174,7 +174,7 @@ export default function BillingDevTab() {
       label: 'Mark Paid', 
       icon: <PaymentIcon />, 
       onClick: async ({ row }) => { 
-        await handleMarkPaid(row.subscription_id);
+        await handleMarkPaid(row.id);
       },
       color: 'success'
     },

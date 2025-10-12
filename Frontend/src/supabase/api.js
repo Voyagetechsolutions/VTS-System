@@ -991,11 +991,11 @@ export async function getPaymentsGlobal({ from, to } = {}) {
 export async function getAllSubscriptionsGlobal() {
   return supabase
     .from('subscriptions')
-    .select('subscription_id, company_id, plan, status, start_date, end_date, amount, companies(company_id, name, is_active)')
+    .select('id, subscription_id, company_id, plan, status, start_date, end_date, amount, next_billing_date, companies(company_id, name, is_active)')
     .order('start_date', { ascending: false });
 }
 export async function updateSubscription(id, updates) {
-  return supabase.from('subscriptions').update(updates).eq('subscription_id', id);
+  return supabase.from('subscriptions').update(updates).eq('id', id);
 }
 export async function suspendCompanyGlobal(company_id) {
   return supabase.from('companies').update({ is_active: false }).eq('company_id', company_id);
@@ -2579,13 +2579,20 @@ export async function getAnnouncements() {
   return supabase.from('announcements').select('*').order('created_at', { ascending: false });
 }
 export async function createAnnouncement(announcement) {
-  const user_id = window.userId || 'system';
-  return supabase.from('announcements').insert([{ 
-    ...announcement, 
-    created_by: user_id,
+  // Get current user ID from Supabase auth
+  const { data: { user } } = await supabase.auth.getUser();
+  const payload = { 
+    ...announcement,
     status: 'draft',
     created_at: new Date().toISOString() 
-  }]).select('*').maybeSingle();
+  };
+  
+  // Only add created_by if we have a user
+  if (user?.id) {
+    payload.created_by = user.id;
+  }
+  
+  return supabase.from('announcements').insert([payload]).select('*').maybeSingle();
 }
 export async function sendAnnouncement(announcement_id) {
   return supabase.from('announcements').update({ 
