@@ -953,6 +953,9 @@ export async function getOpsSnapshotFromViews(companyId) {
 export async function getAllCompanies() {
   return supabase.from('companies').select('company_id, name, subscription_plan, created_at, is_active').order('created_at', { ascending: false });
 }
+export async function getAllCompaniesGlobal() {
+  return supabase.from('companies').select('company_id, name, subscription_plan, created_at, is_active').order('created_at', { ascending: false });
+}
 export async function verifyCompany(company_id) {
   return supabase.from('companies').update({ is_active: true }).eq('company_id', company_id);
 }
