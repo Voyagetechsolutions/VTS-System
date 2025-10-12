@@ -52,10 +52,16 @@ export default function BillingDevTab() {
   });
 
   const getPaymentStatus = (sub) => {
-    // Mock payment status logic - replace with actual implementation
-    if (sub.status === 'Active') return 'Paid';
-    if (sub.status === 'Past Due') return 'Overdue';
-    return 'Pending';
+    if (sub.status === 'suspended' || sub.status === 'cancelled') return 'Suspended';
+    if (!sub.next_billing_date) return 'Paid';
+    
+    const nextBilling = new Date(sub.next_billing_date);
+    const now = new Date();
+    const daysUntilDue = Math.ceil((nextBilling - now) / (1000 * 60 * 60 * 24));
+    
+    if (daysUntilDue < 0) return 'Overdue';
+    if (daysUntilDue <= 7) return 'Pending';
+    return 'Paid';
   };
 
   const getPaymentStatusColor = (status) => {
@@ -263,9 +269,9 @@ export default function BillingDevTab() {
                   onChange={(e) => setPlanFilter(e.target.value)}
                 >
                   <MenuItem value="">All</MenuItem>
-                  <MenuItem value="Basic">Basic</MenuItem>
-                  <MenuItem value="Standard">Standard</MenuItem>
-                  <MenuItem value="Premium">Premium</MenuItem>
+                  <MenuItem value="basic">Basic</MenuItem>
+                  <MenuItem value="standard">Standard</MenuItem>
+                  <MenuItem value="premium">Premium</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -331,14 +337,14 @@ export default function BillingDevTab() {
                 headerName: 'Plan',
                 renderCell: (params) => (
                   <Chip 
-                    label={params.value} 
-                    color={params.value === 'Premium' ? 'primary' : params.value === 'Standard' ? 'secondary' : 'default'}
+                    label={params.value?.charAt(0).toUpperCase() + params.value?.slice(1) || 'N/A'} 
+                    color={params.value === 'premium' ? 'primary' : params.value === 'standard' ? 'secondary' : 'default'}
                     size="small"
                   />
                 )
               },
               { 
-                field: 'current_period_end', 
+                field: 'next_billing_date', 
                 headerName: 'Next Billing Date',
                 type: 'date',
                 renderCell: (params) => (
