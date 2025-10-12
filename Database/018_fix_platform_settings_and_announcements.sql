@@ -14,9 +14,9 @@ CREATE TABLE platform_settings (
 -- Enable RLS
 ALTER TABLE platform_settings ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies
-CREATE POLICY "Developers can view platform settings"
-ON platform_settings FOR SELECT
+-- Create RLS policies for developers (ALL operations)
+CREATE POLICY "Developers have full access to platform settings"
+ON platform_settings FOR ALL
 TO authenticated
 USING (
   EXISTS (
@@ -24,22 +24,7 @@ USING (
     WHERE users.auth_user_id = auth.uid()
     AND users.role = 'developer'
   )
-);
-
-CREATE POLICY "Developers can update platform settings"
-ON platform_settings FOR UPDATE
-TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM users
-    WHERE users.auth_user_id = auth.uid()
-    AND users.role = 'developer'
-  )
-);
-
-CREATE POLICY "Developers can insert platform settings"
-ON platform_settings FOR INSERT
-TO authenticated
+)
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM users
@@ -121,10 +106,11 @@ DROP POLICY IF EXISTS "Developers can view all announcements" ON announcements;
 DROP POLICY IF EXISTS "Developers can insert announcements" ON announcements;
 DROP POLICY IF EXISTS "Developers can update announcements" ON announcements;
 DROP POLICY IF EXISTS "Developers can delete announcements" ON announcements;
+DROP POLICY IF EXISTS "Developers have full access to announcements" ON announcements;
 
--- Create RLS policies for announcements
-CREATE POLICY "Developers can view all announcements"
-ON announcements FOR SELECT
+-- Create RLS policy for announcements (ALL operations)
+CREATE POLICY "Developers have full access to announcements"
+ON announcements FOR ALL
 TO authenticated
 USING (
   EXISTS (
@@ -132,34 +118,8 @@ USING (
     WHERE users.auth_user_id = auth.uid()
     AND users.role = 'developer'
   )
-);
-
-CREATE POLICY "Developers can insert announcements"
-ON announcements FOR INSERT
-TO authenticated
+)
 WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM users
-    WHERE users.auth_user_id = auth.uid()
-    AND users.role = 'developer'
-  )
-);
-
-CREATE POLICY "Developers can update announcements"
-ON announcements FOR UPDATE
-TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM users
-    WHERE users.auth_user_id = auth.uid()
-    AND users.role = 'developer'
-  )
-);
-
-CREATE POLICY "Developers can delete announcements"
-ON announcements FOR DELETE
-TO authenticated
-USING (
   EXISTS (
     SELECT 1 FROM users
     WHERE users.auth_user_id = auth.uid()
