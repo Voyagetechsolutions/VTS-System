@@ -53,17 +53,8 @@ export default function BillingDevTab() {
 
   useEffect(() => { load(); }, []);
 
-  const filteredSubs = subs.filter(sub => {
-    const company = companies.find(c => c.company_id === sub.company_id);
-    return (
-      (planFilter ? sub.plan === planFilter : true) &&
-      (statusFilter ? sub.status === statusFilter : true) &&
-      (paymentStatusFilter ? getPaymentStatus(sub) === paymentStatusFilter : true) &&
-      (searchCompany ? (company?.name || '').toLowerCase().includes(searchCompany.toLowerCase()) : true)
-    );
-  });
-
   const getPaymentStatus = (sub) => {
+    if (!sub) return 'Unknown';
     if (sub.status === 'suspended' || sub.status === 'cancelled') return 'Suspended';
     if (!sub.next_billing_date) return 'Paid';
     
@@ -75,6 +66,16 @@ export default function BillingDevTab() {
     if (daysUntilDue <= 7) return 'Pending';
     return 'Paid';
   };
+
+  const filteredSubs = subs.filter(sub => {
+    const company = companies.find(c => c.company_id === sub.company_id);
+    return (
+      (planFilter ? sub.plan === planFilter : true) &&
+      (statusFilter ? sub.status === statusFilter : true) &&
+      (paymentStatusFilter ? getPaymentStatus(sub) === paymentStatusFilter : true) &&
+      (searchCompany ? (company?.name || '').toLowerCase().includes(searchCompany.toLowerCase()) : true)
+    );
+  });
 
   const getPaymentStatusColor = (status) => {
     switch (status) {
