@@ -123,6 +123,20 @@ ALTER TABLE maintenance_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE hr_actions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE staff ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Company admins can view their incidents" ON incidents;
+DROP POLICY IF EXISTS "Company admins can manage their incidents" ON incidents;
+DROP POLICY IF EXISTS "Company admins can view their refunds" ON refunds;
+DROP POLICY IF EXISTS "Company admins can manage their refunds" ON refunds;
+DROP POLICY IF EXISTS "Company admins can view their route requests" ON route_requests;
+DROP POLICY IF EXISTS "Company admins can manage their route requests" ON route_requests;
+DROP POLICY IF EXISTS "Company admins can view their maintenance requests" ON maintenance_requests;
+DROP POLICY IF EXISTS "Company admins can manage their maintenance requests" ON maintenance_requests;
+DROP POLICY IF EXISTS "Company admins can view their HR actions" ON hr_actions;
+DROP POLICY IF EXISTS "Company admins can manage their HR actions" ON hr_actions;
+DROP POLICY IF EXISTS "Company admins can view their staff" ON staff;
+DROP POLICY IF EXISTS "Company admins can manage their staff" ON staff;
+
 -- Create RLS policies for company admins and developers
 -- Incidents
 CREATE POLICY "Company admins can view their incidents"
