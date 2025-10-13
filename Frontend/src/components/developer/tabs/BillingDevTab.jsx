@@ -67,7 +67,7 @@ export default function BillingDevTab() {
     return 'Paid';
   };
 
-  const filteredSubs = subs.filter(sub => {
+  const filteredSubs = Array.isArray(subs) ? subs.filter(sub => {
     const company = companies.find(c => c.company_id === sub.company_id);
     return (
       (planFilter ? sub.plan === planFilter : true) &&
@@ -75,7 +75,7 @@ export default function BillingDevTab() {
       (paymentStatusFilter ? getPaymentStatus(sub) === paymentStatusFilter : true) &&
       (searchCompany ? (company?.name || '').toLowerCase().includes(searchCompany.toLowerCase()) : true)
     );
-  });
+  }) : [];
 
   const getPaymentStatusColor = (status) => {
     switch (status) {
