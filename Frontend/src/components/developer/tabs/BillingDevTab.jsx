@@ -30,9 +30,21 @@ export default function BillingDevTab() {
         getPaymentsGlobal({}), 
         getAllCompaniesGlobal()
       ]);
+      
+      console.log('Subscriptions response:', s);
+      console.log('Payments response:', i);
+      console.log('Companies response:', c);
+      
+      if (s.error) console.error('Subscriptions error:', s.error);
+      if (i.error) console.error('Payments error:', i.error);
+      if (c.error) console.error('Companies error:', c.error);
+      
       setSubs(s.data || []);
       setInvoices(i.data || []);
       setCompanies(c.data || []);
+      
+      console.log('Loaded subscriptions:', s.data?.length || 0);
+      console.log('Loaded companies:', c.data?.length || 0);
     } catch (error) {
       console.error('Error loading billing data:', error);
     }
