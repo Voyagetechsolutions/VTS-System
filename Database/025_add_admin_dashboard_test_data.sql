@@ -4,13 +4,13 @@
 -- Get a company_id and user_id for test data
 DO $$
 DECLARE
-  test_company_id UUID;
+  test_company_id UUID := '323e03ac-3937-42af-8e6d-6a12481a487c';
   test_user_id UUID;
   test_bus_id UUID;
   test_booking_id UUID;
 BEGIN
-  -- Get first company
-  SELECT company_id INTO test_company_id FROM companies LIMIT 1;
+  -- Using your specific company ID
+  -- test_company_id is already set above
   
   -- Get first user
   SELECT user_id INTO test_user_id FROM users LIMIT 1;
