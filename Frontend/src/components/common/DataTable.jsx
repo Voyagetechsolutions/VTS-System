@@ -70,15 +70,18 @@ const DataTable = ({
   const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
   const [actionMenuRow, setActionMenuRow] = useState(null);
 
+  // Ensure data is always an array
+  const safeData = Array.isArray(data) ? data : [];
+
   // Filter data based on search term
   const filteredData = searchable && searchTerm
-    ? data.filter((row) =>
+    ? safeData.filter((row) =>
         columns.some((column) => {
           const value = row[column.field];
           return value?.toString().toLowerCase().includes(searchTerm.toLowerCase());
         })
       )
-    : data;
+    : safeData;
 
   // Sort data
   const sortedData = sortable && sortConfig.key
