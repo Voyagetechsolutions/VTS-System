@@ -16,13 +16,18 @@ export default function CommunicationsTab() {
     setMessages(m.data || []);
     setAnn(a.data || []);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
   useEffect(() => {
     const subs = [
       subscribeToMessages(load),
       subscribeToAnnouncements(load)
     ];
-    return () => { subs.forEach(s => { try { s.unsubscribe?.(); } catch {} }); };
+    return () => { subs.forEach(s => { try { s.unsubscribe?.(); } catch (error) { console.warn('Subscription cleanup error:', error); } }); };
   }, []);
 
   const send = async () => {

@@ -25,7 +25,8 @@ import {
   TableRow,
   Paper,
   Alert,
-  Snackbar
+  Snackbar,
+  Tooltip
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -37,7 +38,9 @@ import {
   Report as ReportIcon,
   DirectionsBus as BusIcon,
   Person as PersonIcon,
-  DateRange as DateRangeIcon
+  DateRange as DateRangeIcon,
+  Error as ErrorIcon,
+  Info as InfoIcon
 } from '@mui/icons-material';
 import { supabase } from '../../../supabase/client';
 import DataTable from '../../common/DataTable';
@@ -441,11 +444,13 @@ function EditIncidentModal({ open, onClose, onSave, incident }) {
 
   useEffect(() => {
     if (incident) {
-      setFormData({
-        status: incident.status || '',
-        resolution: incident.resolution || '',
-        assigned_to: incident.assigned_to || ''
-      });
+      setTimeout(() => {
+        setFormData({
+          status: incident.status || '',
+          resolution: incident.resolution || '',
+          assigned_to: incident.assigned_to || ''
+        });
+      }, 0);
     }
   }, [incident]);
 

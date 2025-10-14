@@ -1,13 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Grid, Typography, Button, Box, Stack, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, TextField, Checkbox, FormControlLabel } from '@mui/material';
-import AltRouteIcon from '@mui/icons-material/AltRoute';
-import DirectionsBusFilledIcon from '@mui/icons-material/DirectionsBusFilled';
-import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
-import PercentIcon from '@mui/icons-material/Percent';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { formatNumber } from '../../../utils/formatters';
 import BarChart from '../../charts/BarChart';
-import { getOpsManagerKPIs, assignBusToRoute, updateTripStatus, upsertTripSchedule, getCompanyAlertsFeed, getCompanyRoutes, getCompanyBuses, getDrivers } from '../../../supabase/api';
+import { getCompanyKPIs, assignBusToRoute, updateTripStatus, upsertTripSchedule, getCompanyAlertsFeed, getCompanyRoutes, getCompanyBuses } from '../../../supabase/api';
 import { subscribeToBookings, subscribeToBuses, subscribeToIncidents, subscribeToTrips } from '../../../supabase/realtime';
 import { supabase } from '../../../supabase/client';
 import CommandCenterMap from '../../companyAdmin/tabs/CommandCenterMap';
@@ -18,8 +13,7 @@ import DataTable from '../../common/DataTable';
 // OverviewTab: Live map, KPIs, alerts, quick actions, charts, timeline, AI suggestions, fatigue alerts
 export default function OverviewTab() {
   const [kpis, setKpis] = useState({});
-  const [alerts, setAlerts] = useState([]);
-  const [timelineTrips, setTimelineTrips] = useState([]);
+  const [todayTrips, setTodayTrips] = useState([]);
   const [buses, setBuses] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [drivers, setDrivers] = useState([]);
@@ -29,16 +23,15 @@ export default function OverviewTab() {
   const [driverMap, setDriverMap] = useState({});
   const [fatigue, setFatigue] = useState([]);
 
-  const loadKPIsAndAlerts = async () => {
-    const [k, a] = await Promise.all([
-      getOpsManagerKPIs().catch(()=>({ data: {} })),
+  const loadKPIsAndAlerts = useCallback(async () => {
+    const [k] = await Promise.all([
+      getCompanyKPIs().catch(()=>({ data: {} })),
       getCompanyAlertsFeed?.().catch(()=>({ data: [] }))
     ]);
     setKpis(k.data || {});
-    setAlerts(a.data || []);
-  };
+  }, []);
 
-  const loadTodayTrips = async () => {
+  const loadTodayTrips = useCallback(async () => {
     const today = new Date();
     const start = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
     const end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
@@ -55,13 +48,11 @@ export default function OverviewTab() {
       const driverLookup = Object.fromEntries((ds||[]).map(d => [d.user_id, d.name]));
       setBusMap(busLookup); setDriverMap(driverLookup);
       setBuses(bs||[]); setRoutes(rs||[]); setDrivers(ds||[]);
-    } catch {}
-    setTimelineTrips(base);
-  };
+    } catch (error) { console.warn('KPIs load error:', error); }
+    setTodayTrips(base);
+  }, []);
 
-  // Removed AI suggestions per spec
-
-  const computeFatigue = async () => {
+  const computeFatigue = useCallback(async () => {
     // Heuristic: if a driver has more than 10 hours driving in last 24h or <8h rest between trips, flag
     const since = new Date(Date.now() - 24*3600*1000).toISOString();
     const { data } = await supabase
@@ -74,7 +65,7 @@ export default function OverviewTab() {
       byDriver[t.driver_id] = byDriver[t.driver_id] || [];
       byDriver[t.driver_id].push(t);
     });
-    const issues = [];
+    const fatigueList = [];
     Object.entries(byDriver).forEach(([driver, list]) => {
       let totalMinutes = 0;
       let restIssue = false;
@@ -89,18 +80,21 @@ export default function OverviewTab() {
         }
       }
       if (totalMinutes > 600 || restIssue) {
-        issues.push({ driver_id: driver, total_minutes: totalMinutes, rest_issue: restIssue });
+        fatigueList.push({ driver_id: driver, total_minutes: totalMinutes, rest_issue: restIssue });
       }
     });
-    setFatigue(issues);
-  };
-
-  // AI suggestions removed
+    setFatigue(fatigueList);
+  }, []);
 
   useEffect(() => {
-    loadKPIsAndAlerts();
-    loadTodayTrips();
-    computeFatigue();
+    const loadAllData = async () => {
+      await Promise.all([
+        loadKPIsAndAlerts(),
+        loadTodayTrips(),
+        computeFatigue()
+      ]);
+    };
+    loadAllData();
     const subs = [
       subscribeToBookings(() => { loadKPIsAndAlerts(); computeFatigue(); }),
       subscribeToBuses(loadKPIsAndAlerts),
@@ -108,7 +102,7 @@ export default function OverviewTab() {
       subscribeToTrips(() => { loadTodayTrips(); computeFatigue(); }),
     ];
     return () => {
-      subs.forEach(s => { try { s.unsubscribe?.(); } catch {} });
+      subs.forEach(sub => { try { sub.unsubscribe?.(); } catch (error) { console.warn('Subscription cleanup error:', error); } });
     };
   }, []);
 
@@ -145,7 +139,7 @@ export default function OverviewTab() {
   const renderTimeline = () => (
     <DashboardCard title="Today\'s Trip Timeline" variant="outlined">
       <Box sx={{ display: 'grid', gap: 1 }}>
-        {(timelineTrips || []).map(t => {
+        {(todayTrips || []).map(t => {
           const start = new Date(t.departure_time);
           const end = new Date(t.arrival_time);
           const durationMins = Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000));
@@ -162,7 +156,7 @@ export default function OverviewTab() {
             </Box>
           );
         })}
-        {(!timelineTrips || timelineTrips.length === 0) && <Typography variant="body2">No trips today</Typography>}
+        {(!todayTrips || todayTrips.length === 0) && <Typography variant="body2">No trips today</Typography>}
       </Box>
     </DashboardCard>
   );
@@ -204,7 +198,7 @@ export default function OverviewTab() {
       <Box mt={4}>
         <DashboardCard title="Today's Trips" variant="outlined">
           <DataTable
-            data={(timelineTrips||[]).map(t => ({
+            data={(todayTrips||[]).map(t => ({
               trip_id: t.trip_id,
               route: t.route_name,
               bus: busMap[t.bus_id] || t.bus_id || '-',
@@ -271,7 +265,7 @@ export default function OverviewTab() {
         <Stack spacing={2} sx={{ mt: 1 }}>
           <Select displayEmpty value={forms.reassign.trip_id} onChange={e => setForms(f => ({ ...f, reassign: { ...f.reassign, trip_id: e.target.value } }))}>
             <MenuItem value="">Select Trip...</MenuItem>
-            {(timelineTrips||[]).map(t => <MenuItem key={t.trip_id} value={t.trip_id}>{t.trip_id} · {t.route_name}</MenuItem>)}
+            {(todayTrips||[]).map(t => <MenuItem key={t.trip_id} value={t.trip_id}>{t.trip_id} · {t.route_name}</MenuItem>)}
           </Select>
           <Select displayEmpty value={forms.reassign.bus_id} onChange={e => setForms(f => ({ ...f, reassign: { ...f.reassign, bus_id: e.target.value } }))}>
             <MenuItem value="">Select Bus...</MenuItem>
@@ -323,7 +317,7 @@ export default function OverviewTab() {
         <Stack spacing={2} sx={{ mt: 1 }}>
           <Select displayEmpty value={forms.delay.trip_id} onChange={e => setForms(f => ({ ...f, delay: { ...f.delay, trip_id: e.target.value } }))}>
             <MenuItem value="">Select Trip...</MenuItem>
-            {(timelineTrips||[]).map(t => <MenuItem key={t.trip_id} value={t.trip_id}>{t.trip_id} · {t.route_name}</MenuItem>)}
+            {(todayTrips||[]).map(t => <MenuItem key={t.trip_id} value={t.trip_id}>{t.trip_id} · {t.route_name}</MenuItem>)}
           </Select>
           <TextField type="number" label="Minutes" value={forms.delay.minutes} onChange={e => setForms(f => ({ ...f, delay: { ...f.delay, minutes: Number(e.target.value||0) } }))} />
           <FormControlLabel control={<Checkbox checked={!!forms.delay.inform} onChange={e => setForms(f => ({ ...f, delay: { ...f.delay, inform: e.target.checked } }))} />} label="Inform passengers" />
@@ -341,7 +335,7 @@ export default function OverviewTab() {
         <Stack spacing={2} sx={{ mt: 1 }}>
           <Select displayEmpty value={forms.cancel.trip_id} onChange={e => setForms(f => ({ ...f, cancel: { ...f.cancel, trip_id: e.target.value } }))}>
             <MenuItem value="">Select Trip...</MenuItem>
-            {(timelineTrips||[]).map(t => <MenuItem key={t.trip_id} value={t.trip_id}>{t.trip_id} · {t.route_name}</MenuItem>)}
+            {(todayTrips||[]).map(t => <MenuItem key={t.trip_id} value={t.trip_id}>{t.trip_id} · {t.route_name}</MenuItem>)}
           </Select>
           <FormControlLabel control={<Checkbox checked={!!forms.cancel.inform} onChange={e => setForms(f => ({ ...f, cancel: { ...f.cancel, inform: e.target.checked } }))} />} label="Inform passengers" />
         </Stack>

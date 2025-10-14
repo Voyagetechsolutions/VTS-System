@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Grid, Box, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Typography } from '@mui/material';
 import DataTable from '../../common/DataTable';
 import { supabase } from '../../../supabase/client';
@@ -15,7 +15,7 @@ export default function TripBoardingManagementTab() {
   const [cameraLoaded, setCameraLoaded] = useState(false);
   const companyId = window.companyId || localStorage.getItem('companyId') || null;
 
-  const load = async (id) => {
+  const load = useCallback(async (id) => {
     if (!id) return;
     const [{ data: bookings }, { data: seats }] = await Promise.all([
       supabase.from('bookings').select('booking_id, ticket_number, passenger_name, id_number, seat_number, status, trip_id').eq('trip_id', id).eq('company_id', companyId),
@@ -23,27 +23,22 @@ export default function TripBoardingManagementTab() {
     ]);
     setManifest(bookings || []);
     setSeatMap(seats || []);
-  };
+  }, [companyId]);
 
-  const loadTripsToday = async () => {
-    const start = new Date(); start.setHours(0,0,0,0);
-    const { data } = await supabase
-      .from('trips_with_details')
-      .select('trip_id, route_name, bus_id, departure_time, passenger_count, capacity, status')
-      .eq('company_id', companyId)
-      .gte('departure_time', start.toISOString())
-      .order('departure_time', { ascending: true });
-    setTripsToday(data || []);
-  };
+  useEffect(() => {
+    const loadTripsToday = async () => {
+      const today = new Date(); today.setHours(0,0,0,0);
+      const { data } = await supabase.from('trips_with_details').select('trip_id, route_name, departure_time, status').eq('company_id', companyId).gte('departure_time', today.toISOString()).order('departure_time');
+      setTripsToday(data || []);
+    };
+    loadTripsToday();
+  }, [companyId]);
 
-  const scanQR = async () => { setScannerOpen(true); };
-
-  const manualCheckIn = async (bookingId) => {
-    try { await checkInBooking(bookingId); load(tripId); } catch { alert('Failed'); }
-  };
-
-  useEffect(() => { loadTripsToday(); }, [companyId]);
-  useEffect(() => { load(tripId); }, [tripId]);
+  useEffect(() => {
+    if (tripId) {
+      setTimeout(() => load(tripId), 0);
+    }
+  }, [tripId, load]);
 
   useEffect(() => {
     if (!scannerOpen) return;
@@ -65,9 +60,9 @@ export default function TripBoardingManagementTab() {
             setScannerOpen(false);
             setQrText('');
             load(tripId);
-          } catch { /* ignore and keep scanning */ }
+          } catch (error) { console.warn('QR scan error:', error); /* ignore and keep scanning */ }
         }, () => {});
-      } catch {}
+      } catch (error) { console.warn('Scanner start error:', error); }
     };
     if (!window.Html5QrcodeScanner) {
       scriptEl = document.createElement('script');
@@ -76,11 +71,23 @@ export default function TripBoardingManagementTab() {
       scriptEl.onload = () => { if (!cancelled) { setCameraLoaded(true); setTimeout(startScanner, 200); } };
       document.body.appendChild(scriptEl);
     } else {
-      setCameraLoaded(true);
-      setTimeout(startScanner, 200);
+      setTimeout(() => {
+        setCameraLoaded(true);
+        setTimeout(startScanner, 200);
+      }, 0);
     }
-    return () => { cancelled = true; try { scanner?.clear(); } catch {} if (scriptEl) { try { scriptEl.onload = null; } catch {} } };
-  }, [scannerOpen]);
+    return () => { cancelled = true; try { scanner?.clear(); } catch (error) { console.warn('Scanner cleanup error:', error); } if (scriptEl) { try { scriptEl.onload = null; } catch (error) { console.warn('Script cleanup error:', error); } } };
+  }, [scannerOpen, tripId, load]);
+
+  const scanQR = () => setScannerOpen(true);
+  const manualCheckIn = async (bookingId) => {
+    try {
+      await checkInBooking(bookingId);
+      load(tripId);
+    } catch (error) {
+      console.warn('Check-in error:', error);
+    }
+  };
 
   return (
     <Grid container spacing={2}>

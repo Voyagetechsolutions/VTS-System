@@ -18,7 +18,7 @@ function setToken(token) {
   try {
     if (token) localStorage.setItem('jwt', token);
     else localStorage.removeItem('jwt');
-  } catch {}
+  } catch (error) { console.warn('API client error:', error); }
 }
 
 async function refreshToken() {
@@ -46,7 +46,7 @@ async function request(path, options = {}, retrying = false) {
     if (typeof window !== 'undefined' && window.companyId != null && window.companyId !== '') {
       headers.set('X-Company-Id', String(window.companyId));
     }
-  } catch {}
+  } catch (error) { console.warn('API client error:', error); }
   if (!headers.has('Content-Type') && options.body && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
@@ -87,7 +87,7 @@ const api = {
   logout: async () => {
     try {
       await request('/api/auth/logout', { method: 'POST' });
-    } catch {}
+    } catch (error) { console.warn('API client error:', error); }
     setToken(null);
   }
 };

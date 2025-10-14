@@ -12,6 +12,20 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import { formatCurrency, formatNumber } from '../../../utils/formatters';
 import { getAdminOversightSnapshot, getOpsSnapshotFromViews } from '../../../supabase/api';
 
+// Section component defined outside to avoid re-creation on each render
+const Section = ({ title, icon, children, kpi, intent = 'default' }) => (
+    <Card sx={{ borderLeft: 4, borderLeftColor: intent === 'danger' ? 'error.main' : intent === 'warning' ? 'warning.main' : 'primary.main' }}>
+      <CardContent>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>{icon}{title}</Typography>
+          {kpi != null && <Chip label={kpi} color={intent === 'danger' ? 'error' : intent === 'warning' ? 'warning' : 'primary'} size="small" />}
+        </Stack>
+        <Divider sx={{ my: 2 }} />
+        {children}
+      </CardContent>
+    </Card>
+);
+
 export default function OversightMapTab() {
   const [snapshot, setSnapshot] = useState(null);
 
@@ -21,7 +35,7 @@ export default function OversightMapTab() {
       try {
         const res = await getOpsSnapshotFromViews();
         data = res.data || null;
-      } catch {}
+      } catch (error) { console.warn('Oversight snapshot error:', error); }
       if (!data) {
         const fallback = await getAdminOversightSnapshot();
         data = fallback.data || null;
@@ -34,19 +48,6 @@ export default function OversightMapTab() {
   }, []);
 
   if (!snapshot) return <Typography>Loading oversight...</Typography>;
-
-  const Section = ({ title, icon, children, kpi, intent = 'default' }) => (
-    <Card sx={{ borderLeft: 4, borderLeftColor: intent === 'danger' ? 'error.main' : intent === 'warning' ? 'warning.main' : 'primary.main' }}>
-      <CardContent>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>{icon}{title}</Typography>
-          {kpi != null && <Chip label={kpi} color={intent === 'danger' ? 'error' : intent === 'warning' ? 'warning' : 'primary'} size="small" />}
-        </Stack>
-        <Divider sx={{ my: 2 }} />
-        {children}
-      </CardContent>
-    </Card>
-  );
 
   return (
     <Box>

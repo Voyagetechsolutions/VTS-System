@@ -91,7 +91,12 @@ export default function CommandCenterTab() {
     setTasks((maintTasks||[]).slice(0, 20));
   };
 
-  useEffect(() => { load(); }, [companyId]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [companyId]);
 
   const handleAssignTask = async () => {
     try {
@@ -103,33 +108,28 @@ export default function CommandCenterTab() {
         priority: taskForm.priority,
         status: 'pending',
         notes: taskForm.notes || null,
-        assigned_to: taskForm.staff_id || null,
         due_date: taskForm.dueDate || null
       }]);
       setShowAssignTask(false);
       setTaskForm({ bus_id: '', title: '', priority: 'medium', notes: '', staff_id: '', dueDate: '' });
       load();
-    } catch (error) {
-      console.error('Error assigning task:', error);
-    }
+    } catch (error) { console.warn('Load error:', error); }
   };
 
   const handleScheduleMaintenance = async () => {
     try {
-      if (!scheduleForm.bus_id) return;
-      await upsertMaintenanceLog({
+      if (!scheduleForm.bus_id || !scheduleForm.maintenanceType) return;
+      await supabase.from('maintenance_schedule').insert([{
+        company_id: companyId,
         bus_id: scheduleForm.bus_id,
-        notes: `Scheduled ${scheduleForm.maintenanceType} maintenance`,
-        status: 'scheduled',
+        maintenance_type: scheduleForm.maintenanceType,
         scheduled_date: scheduleForm.date,
         workshop_bay: scheduleForm.workshopBay
-      });
+      }]);
       setShowScheduleMaintenance(false);
       setScheduleForm({ bus_id: '', maintenanceType: '', date: '', workshopBay: '' });
       load();
-    } catch (error) {
-      console.error('Error scheduling maintenance:', error);
-    }
+    } catch (error) { console.warn('Load error:', error); }
   };
 
   const handleAddStaff = async () => {
@@ -138,7 +138,7 @@ export default function CommandCenterTab() {
       await supabase.from('users').insert([{
         company_id: companyId,
         name: staffForm.name,
-        email: staffForm.email.toLowerCase(),
+        email: staffForm.email,
         role: staffForm.role,
         phone: staffForm.contact,
         is_active: staffForm.status === 'Active'
@@ -146,9 +146,7 @@ export default function CommandCenterTab() {
       setShowAddStaff(false);
       setStaffForm({ name: '', email: '', role: 'maintenance_tech', contact: '', status: 'Active' });
       load();
-    } catch (error) {
-      console.error('Error adding staff:', error);
-    }
+    } catch (error) { console.warn('Load error:', error); }
   };
 
   const handleGenerateReport = async () => {
@@ -160,9 +158,7 @@ export default function CommandCenterTab() {
       }]);
       alert('Report generation queued');
       setShowGenerateReport(false);
-    } catch (error) {
-      console.error('Error generating report:', error);
-    }
+    } catch (error) { console.warn('Load error:', error); }
   };
 
   return (

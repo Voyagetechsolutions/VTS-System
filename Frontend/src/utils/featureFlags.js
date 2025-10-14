@@ -10,12 +10,12 @@ export function isEnabled(flag) {
     const override = localStorage.getItem(`ff_${flag}`);
     if (override === 'true') return true;
     if (override === 'false') return false;
-  } catch {}
+  } catch (error) { console.warn('Feature flags error:', error); }
   return !!env[flag];
 }
 
 export function setFlag(flag, value) {
-  try { localStorage.setItem(`ff_${flag}`, value ? 'true' : 'false'); } catch {}
+  try { localStorage.setItem(`ff_${flag}`, value ? 'true' : 'false'); } catch (error) { console.warn('Feature flags error:', error); }
 }
 
 

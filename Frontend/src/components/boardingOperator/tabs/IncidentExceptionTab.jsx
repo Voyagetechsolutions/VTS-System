@@ -9,17 +9,20 @@ export default function IncidentExceptionTab() {
   const [type, setType] = useState('');
   const [details, setDetails] = useState('');
 
-  const load = async () => {
-    const r = await getIncidents();
-    setRows(r.data || []);
-  };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      const r = await getIncidents();
+      setRows(r.data || []);
+    };
+    loadData();
+  }, []);
 
   const submit = async () => {
     if (!type.trim()) return;
     await createIncident({ type, details });
     setType(''); setDetails('');
-    load();
+    const r = await getIncidents();
+    setRows(r.data || []);
   };
 
   return (

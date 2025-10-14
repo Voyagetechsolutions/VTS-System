@@ -85,7 +85,12 @@ export default function BookingsDevTab() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
 
   const filteredBookings = bookings.filter(booking => (
     (bookingSearch ? 

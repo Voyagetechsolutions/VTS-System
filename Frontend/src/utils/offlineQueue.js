@@ -6,7 +6,7 @@ function readQueue() {
   try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
 }
 function writeQueue(q) {
-  try { localStorage.setItem(KEY, JSON.stringify(q.slice(0, 500))); } catch {}
+  try { localStorage.setItem(KEY, JSON.stringify(q.slice(0, 500))); } catch (error) { console.warn('Offline queue error:', error); }
 }
 
 export function enqueue(action) {
@@ -48,7 +48,5 @@ export function startBackgroundSync(handlers, ms = 60 * 1000) {
   }, ms);
 }
 export function stopBackgroundSync() {
-  try { if (intervalId) clearInterval(intervalId); } catch {}
+  try { if (intervalId) clearInterval(intervalId); } catch (error) { console.warn('Offline queue error:', error); }
 }
-
-

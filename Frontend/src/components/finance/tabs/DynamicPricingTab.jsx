@@ -19,7 +19,12 @@ export default function DynamicPricingTab() {
     setRules(r || []);
     setPromos(p || []);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
 
   const onCompute = async () => {
     const res = await computeDynamicPrice(routeId || null, Number(base || 0));

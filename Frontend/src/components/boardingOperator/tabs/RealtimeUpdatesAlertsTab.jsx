@@ -9,7 +9,7 @@ export default function RealtimeUpdatesAlertsTab() {
     const add = (a) => setAlerts(prev => [{ created_at: new Date().toISOString(), ...a }, ...prev].slice(0, 200));
     const tripsSub = subscribeToTrips(() => add({ type: 'trip_update', message: 'Trip updated' }));
     const incSub = subscribeToIncidents(() => add({ type: 'incident', message: 'New incident reported' }));
-    return () => { try { tripsSub.unsubscribe?.(); incSub.unsubscribe?.(); } catch {} };
+    return () => { try { tripsSub.unsubscribe?.(); incSub.unsubscribe?.(); } catch (error) { console.warn('Cleanup error:', error); } };
   }, []);
   return (
     <DashboardCard title="Realtime Updates & Alerts" variant="outlined">

@@ -16,7 +16,12 @@ export default function RecruitmentTab() {
     ]);
     setJobs(j||[]); setApps(a||[]);
   };
-  useEffect(() => { load(); }, [companyId]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [companyId]);
   return (
     <Grid container spacing={2}>
       <Grid item xs={12} md={6}><DashboardCard title="Job Postings" variant="outlined" headerAction={<ModernButton icon="add" onClick={async ()=>{

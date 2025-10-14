@@ -1,23 +1,32 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Paper, Typography, Stack, TextField, Button, Divider, List, ListItem, ListItemText } from '@mui/material';
-import { listSupportTickets, createSupportTicket, resolveSupportTicket, assignSupportTicket } from '../../../supabase/api';
+import { listSupportTickets, createSupportTicket, resolveSupportTicket } from '../../../supabase/api';
 
 export default function SupportTab() {
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [tickets, setTickets] = useState([]);
 
-  const load = async () => {
-    const { data } = await listSupportTickets();
-    setTickets(data || []);
-  };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const loadData = async () => {
+      const { data } = await listSupportTickets();
+      setTickets(data || []);
+    };
+    loadData();
+  }, []);
 
   const submit = async () => {
     if (!title || !message) return;
     await createSupportTicket(title, message);
     setTitle(''); setMessage('');
-    load();
+    const { data } = await listSupportTickets();
+    setTickets(data || []);
+  };
+
+  const resolve = async (id) => { 
+    await resolveSupportTicket(id); 
+    const { data } = await listSupportTickets();
+    setTickets(data || []);
   };
 
   return (
@@ -32,7 +41,7 @@ export default function SupportTab() {
         <Divider sx={{ my: 2 }} />
         <List dense>
           {(tickets || []).map(t => (
-            <ListItem key={t.id} secondaryAction={<Button size="small" onClick={async () => { await resolveSupportTicket(t.id); load(); }}>Resolve</Button>}>
+            <ListItem key={t.id} secondaryAction={<Button size="small" onClick={() => resolve(t.id)}>Resolve</Button>}>
               <ListItemText primary={t.title} secondary={`${t.status} • ${new Date(t.created_at).toLocaleString()}`} />
             </ListItem>
           ))}

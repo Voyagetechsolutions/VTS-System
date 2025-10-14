@@ -24,7 +24,12 @@ export default function FleetTab() {
     setBuses(data || []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
   useEffect(() => { (async () => { try { const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole') || 'admin'; const { data } = await getCompanySettings(); setCanEdit(!!(data?.rbac?.[role]?.edit)); } catch { setCanEdit(true); } })(); }, []);
   useEffect(() => { (async () => { const { data } = await getDrivers(); setDrivers(data || []); })(); }, []);
 

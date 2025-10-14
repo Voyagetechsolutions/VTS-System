@@ -12,11 +12,15 @@ export default function PassengersTab() {
   const [form, setForm] = useState({ name: '', email: '', phone: '' });
   const [lostFound, setLostFound] = useState([]);
 
-  const load = async () => {
-    const { data } = await supabase.from('customers').select('id, name, email, phone, trips_completed, loyalty_points, is_blacklisted, assistance_notes').eq('company_id', window.companyId).order('name');
-    setPassengers(data || []);
-  };
-  useEffect(() => { load(); (async ()=>{ const lf = await listLostFound(); setLostFound(lf.data || []); })(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      const { data } = await supabase.from('customers').select('id, name, email, phone, trips_completed, loyalty_points, is_blacklisted, assistance_notes').eq('company_id', window.companyId).order('name');
+      setPassengers(data || []);
+      const lf = await listLostFound(); 
+      setLostFound(lf.data || []); 
+    };
+    loadData();
+  }, []);
 
   const filtered = passengers.filter(p => (p.name||'').toLowerCase().includes(search.toLowerCase()) || (p.phone||'').toLowerCase().includes(search.toLowerCase()) || (p.email||'').toLowerCase().includes(search.toLowerCase()));
 
@@ -46,10 +50,10 @@ export default function PassengersTab() {
               <TableCell>{Number(p.loyalty_points||0).toFixed(0)}</TableCell>
               <TableCell>{p.is_blacklisted ? 'Yes' : 'No'}</TableCell>
               <TableCell>
-                <Button size="small" onClick={async () => { await supabase.from('customers').update({ trips_completed: (p.trips_completed||0)+1 }).eq('id', p.id); load(); }}>Add Trip</Button>
-                <Button size="small" sx={{ ml: 1 }} onClick={async () => { const pts = Number(prompt('Add loyalty points?')||0); if (!pts) return; await updateCustomerLoyalty(p.id, pts); load(); }}>Add Points</Button>
-                {!p.is_blacklisted && <Button size="small" color="warning" sx={{ ml: 1 }} onClick={async () => { const reason = prompt('Blacklist reason'); await blacklistCustomer(p.id, reason); load(); }}>Blacklist</Button>}
-                {p.is_blacklisted && <Button size="small" color="success" sx={{ ml: 1 }} onClick={async () => { await unblacklistCustomer(p.id); load(); }}>Unblacklist</Button>}
+                <Button size="small" onClick={async () => { await supabase.from('customers').update({ trips_completed: (p.trips_completed||0)+1 }).eq('id', p.id); const { data } = await supabase.from('customers').select('id, name, email, phone, trips_completed, loyalty_points, is_blacklisted, assistance_notes').eq('company_id', window.companyId).order('name'); setPassengers(data || []); }}>Add Trip</Button>
+                <Button size="small" sx={{ ml: 1 }} onClick={async () => { const pts = Number(prompt('Add loyalty points?')||0); if (!pts) return; await updateCustomerLoyalty(p.id, pts); const { data } = await supabase.from('customers').select('id, name, email, phone, trips_completed, loyalty_points, is_blacklisted, assistance_notes').eq('company_id', window.companyId).order('name'); setPassengers(data || []); }}>Add Points</Button>
+                {!p.is_blacklisted && <Button size="small" color="warning" sx={{ ml: 1 }} onClick={async () => { const reason = prompt('Blacklist reason'); await blacklistCustomer(p.id, reason); const { data } = await supabase.from('customers').select('id, name, email, phone, trips_completed, loyalty_points, is_blacklisted, assistance_notes').eq('company_id', window.companyId).order('name'); setPassengers(data || []); }}>Blacklist</Button>}
+                {p.is_blacklisted && <Button size="small" color="success" sx={{ ml: 1 }} onClick={async () => { await unblacklistCustomer(p.id); const { data } = await supabase.from('customers').select('id, name, email, phone, trips_completed, loyalty_points, is_blacklisted, assistance_notes').eq('company_id', window.companyId).order('name'); setPassengers(data || []); }}>Unblacklist</Button>}
               </TableCell>
             </TableRow>
           ))}
@@ -73,7 +77,7 @@ export default function PassengersTab() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={async () => { await supabase.from('customers').insert([{ company_id: window.companyId, name: form.name, email: form.email, phone: form.phone }]); setDialogOpen(false); setForm({ name: '', email: '', phone: '' }); load(); }}>Save</Button>
+          <Button variant="contained" onClick={async () => { await supabase.from('customers').insert([{ company_id: window.companyId, name: form.name, email: form.email, phone: form.phone }]); setDialogOpen(false); setForm({ name: '', email: '', phone: '' }); const { data } = await supabase.from('customers').select('id, name, email, phone, trips_completed, loyalty_points, is_blacklisted, assistance_notes').eq('company_id', window.companyId).order('name'); setPassengers(data || []); }}>Save</Button>
         </DialogActions>
       </Dialog>
 

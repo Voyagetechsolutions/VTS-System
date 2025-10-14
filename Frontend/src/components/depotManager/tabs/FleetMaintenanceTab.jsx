@@ -28,7 +28,12 @@ export default function FleetMaintenanceTab() {
     const dt = (logs||[]).map(x => ({ bus_id: x.bus_id, hours: x.duration_hours, date: x.created_at }));
     setDowntime(dt);
   };
-  useEffect(() => { load(); }, [companyId]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [companyId]);
 
   return (
     <Grid container spacing={2}>

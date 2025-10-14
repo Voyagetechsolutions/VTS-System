@@ -50,7 +50,12 @@ export default function CompaniesDevTab() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
 
   const inRange = (d) => {
     const ts = d ? new Date(d).getTime() : null;

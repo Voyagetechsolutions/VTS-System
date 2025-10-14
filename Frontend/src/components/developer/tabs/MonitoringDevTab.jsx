@@ -76,7 +76,12 @@ export default function MonitoringDevTab() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
 
   const filteredActivityLogs = activityLogs.filter(log => (
     (logSearch ? 

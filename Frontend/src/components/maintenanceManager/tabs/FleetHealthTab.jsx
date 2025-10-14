@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Card, CardContent, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControl, InputLabel, Select, MenuItem, Chip, IconButton, Avatar, Grid, FormControlLabel, Switch } from '@mui/material';
-import { DirectionsBus as BusIcon, Build as BuildIcon, Warning as WarningIcon, Schedule as ScheduleIcon, History as HistoryIcon, TrendingUp as TrendingUpIcon, CheckCircle as CheckCircleIcon } from '@mui/icons-material';
+import { Grid, Box, Card, CardContent, Typography, Chip, LinearProgress, Divider, List, ListItem, ListItemText, ListItemIcon } from '@mui/material';
+import { DirectionsBus as BusIcon, Build as BuildIcon, CheckCircle as CheckCircleIcon, Error as ErrorIcon, Schedule as ScheduleIcon, LocalGasStation as FuelIcon, Speed as SpeedIcon } from '@mui/icons-material';
 import DataTable from '../../common/DataTable';
 import { supabase } from '../../../supabase/client';
 

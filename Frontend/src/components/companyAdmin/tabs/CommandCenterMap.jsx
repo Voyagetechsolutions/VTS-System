@@ -30,13 +30,16 @@ export default function CommandCenterMap() {
         .order('created_at', { ascending: false })
         .limit(100);
       setIncidents((inc || []).filter(i => i.latitude && i.longitude));
-    } catch {}
+    } catch (error) { console.warn('Map operation error:', error); }
   };
 
   useEffect(() => {
-    load();
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
     const sub = subscribeToBuses(() => load());
-    return () => { try { sub.unsubscribe?.(); } catch {} };
+    return () => { try { sub.unsubscribe?.(); } catch (error) { console.warn('Subscription cleanup error:', error); } };
   }, []);
 
   useEffect(() => {
@@ -78,7 +81,7 @@ export default function CommandCenterMap() {
     const markers = incidentMarkersRef.current;
     // Clear markers if toggled off
     if (!showIncidents) {
-      Object.values(markers).forEach(m => { try { map.removeLayer(m); } catch {} });
+      Object.values(markers).forEach(m => { try { map.removeLayer(m); } catch { /* Ignore removal errors */ } });
       incidentMarkersRef.current = {};
       return;
     }

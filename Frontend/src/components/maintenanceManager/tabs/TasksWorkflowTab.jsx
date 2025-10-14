@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Box, TextField, Button, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, Stack } from '@mui/material';
 import DashboardCard from '../../common/DashboardCard';
 import DataTable from '../../common/DataTable';
@@ -11,21 +11,25 @@ export default function TasksWorkflowTab() {
   const [assignee, setAssignee] = useState('');
   const companyId = window.companyId || localStorage.getItem('companyId');
   const [addOpen, setAddOpen] = useState(false);
-  const [form, setForm] = useState({ title: '', type: '', priority: 'medium', bus_id: '', staff_id: '' });
+  const [form, setForm] = useState({ title: '', type: '', priority: 'medium', bus_id: '', staff_id: '', description: '', assigned_to: '', due_date: '' });
   const [buses, setBuses] = useState([]);
   const [staff, setStaff] = useState([]);
 
-  const load = async () => {
-    let q = supabase.from('maintenance_tasks').select('id, bus_id, title, type, status, priority, staff_id').eq('company_id', companyId);
-    const { data } = await q;
+  const load = useCallback(async () => {
+    const { data } = await supabase.from('maintenance_tasks').select('task_id, bus_id, type, description, status, assigned_to, due_date, created_at').eq('company_id', companyId).order('created_at', { ascending: false });
     setRows(data || []);
-  };
-  useEffect(() => { load(); }, [companyId]);
+  }, [companyId]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [load]);
 
   useEffect(() => { (async ()=>{ try { const [{ data: bs }, { data: st }] = await Promise.all([
     supabase.from('buses').select('bus_id, license_plate').eq('company_id', companyId),
     supabase.from('users').select('user_id, name, role').eq('company_id', companyId),
-  ]); setBuses(bs||[]); setStaff(st||[]); } catch {} })(); }, [companyId]);
+  ]); setBuses(bs||[]); setStaff(st||[]); } catch (error) { console.warn('Failed to load buses/staff:', error); setBuses([]); setStaff([]); } })(); }, [companyId]);
 
   const startTask = async (row) => { await supabase.from('maintenance_tasks').update({ status: 'in_progress' }).eq('id', row.id); load(); };
   const completeTask = async (row) => {
@@ -47,8 +51,8 @@ export default function TasksWorkflowTab() {
 
   const addTask = async () => {
     if (!form.title || !form.bus_id || !form.staff_id) return;
-    await supabase.from('maintenance_tasks').insert([{ company_id: companyId, title: form.title, type: form.type || null, priority: form.priority, bus_id: form.bus_id, staff_id: form.staff_id, status: 'open' }]);
-    setAddOpen(false); setForm({ title: '', type: '', priority: 'medium', bus_id: '', staff_id: '' });
+    try { await supabase.from('maintenance_tasks').insert([{ company_id: companyId, bus_id: form.bus_id, type: form.type, description: form.description, assigned_to: form.assigned_to, due_date: form.due_date }]); setForm({ bus_id: '', type: '', description: '', assigned_to: '', due_date: '' }); load(); } catch (error) { console.error('Failed to create task:', error); }
+    setForm({ title: '', type: '', priority: 'medium', bus_id: '', staff_id: '', description: '', assigned_to: '', due_date: '' });
     load();
   };
 

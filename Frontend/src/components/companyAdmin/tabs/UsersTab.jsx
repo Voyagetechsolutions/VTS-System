@@ -1,291 +1,414 @@
-import React, { useEffect, useState } from 'react';
-import { Table, TableHead, TableRow, TableCell, TableBody, TablePagination, Button, TextField, Select, MenuItem, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Stack, Divider, Chip, Tooltip, Box } from '@mui/material';
-import { getCompanyUsers, createUser, updateUser, deleteUser, getBranches, getCompanySettings } from '../../../supabase/api';
-import { requireString, requireEmail } from '../../../utils/validation';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Box,
+  Button,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControl,
+  Grid,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TablePagination,
+  TableRow,
+  TextField,
+  Tooltip,
+  Typography,
+  CircularProgress,
+  Paper,
+} from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import LockResetIcon from '@mui/icons-material/LockReset';
+import DashboardCard from '../../common/DashboardCard';
+import {
+  searchCompanyUsers,
+  createCompanyUser,
+  updateCompanyUser,
+  deleteCompanyUser,
+  resetUserPassword,
+} from '../../../supabase/api';
+import { useSnackbar } from 'notistack';
+
+const roleOptions = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'driver', label: 'Driver' },
+  { value: 'agent', label: 'Agent' },
+];
+
+const statusOptions = [
+  { value: 'Pending', label: 'Pending' },
+  { value: 'Active', label: 'Active' },
+  { value: 'Suspended', label: 'Suspended' },
+];
+
+const statusColor = (status) => {
+  if (status === 'Active') return 'success';
+  if (status === 'Suspended') return 'error';
+  return 'warning';
+};
+
+const initialForm = {
+  name: '',
+  email: '',
+  role: 'driver',
+  branch: '',
+  status: 'Pending',
+};
 
 export default function UsersTab() {
+  const { enqueueSnackbar } = useSnackbar();
   const [users, setUsers] = useState([]);
-  const [search, setSearch] = useState('');
-  const [role, setRole] = useState('');
-  const [emailSearch, setEmailSearch] = useState('');
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [searchName, setSearchName] = useState('');
+  const [searchEmail, setSearchEmail] = useState('');
+  const [filters, setFilters] = useState({ search: '', email: '' });
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ name: '', email: '', role: 'driver', is_active: true, password_hash: '', branch_id: '' });
-  const [branches, setBranches] = useState([]);
-  const [canEdit, setCanEdit] = useState(true);
-  const [empOpen, setEmpOpen] = useState(false);
-  const [empForm, setEmpForm] = useState({
-    full_name: '', id_passport: '', address: '', phone: '', emergency_contact: { name: '', relation: '', phone: '' },
-    employer: { company_name: '', registration_no: '', address: '', contact: '' },
-    job: { title: '', description: '', location: '', hours: '' },
-    compensation: { salary: '', frequency: 'monthly', overtime_rate: '', bonuses: '', benefits: '' },
-    leave_entitlements: { annual: '', sick: '', maternity: '', paternity: '', public_holidays: '' },
-    contract: { type: 'permanent', start_date: '', end_date: '', notice_period: '', termination_grounds: '' },
-    other_terms: { confidentiality: true, non_compete: false, disciplinary: '', dispute_resolution: '' },
-  });
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [form, setForm] = useState(initialForm);
+  const [formErrors, setFormErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [targetUser, setTargetUser] = useState(null);
 
   useEffect(() => {
-    getCompanyUsers().then(({ data }) => setUsers(data || []));
-    getBranches().then(({ data }) => setBranches(data || []));
-    (async () => { try { const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole') || 'admin'; const { data } = await getCompanySettings(); setCanEdit(!!(data?.rbac?.[role]?.edit)); } catch { setCanEdit(true); } })();
-  }, []);
+    const timer = setTimeout(() => {
+      setFilters({ search: searchName.trim(), email: searchEmail.trim() });
+      setPage(0);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchName, searchEmail]);
 
-  const loadVerification = async () => {
+  const loadUsers = async (pageIndex = page, limit = rowsPerPage, activeFilters = filters) => {
     try {
-      const ids = (users || []).map(u => u.user_id).filter(Boolean);
-      if (ids.length === 0) return;
-      const url = `${process.env.REACT_APP_SUPABASE_URL || ''}/functions/v1/admin_user_status`;
-      const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(window.supabase && (await window.supabase.auth.getSession()).data?.session?.access_token) || ''}` }, body: JSON.stringify({ user_ids: ids }) });
-      const json = await resp.json();
-      if (json?.users) {
-        setUsers(prev => prev.map(u => ({ ...u, email_confirmed_at: json.users[u.user_id]?.email_confirmed_at || null })));
-      }
-    } catch {}
-  };
-
-  useEffect(() => { if (users.length) loadVerification(); }, [users.length]);
-
-  const filtered = users.filter(u =>
-    (u.name || '').toLowerCase().includes((search||'').toLowerCase()) &&
-    ((emailSearch||'') === '' ? true : (u.email||'').toLowerCase().includes(emailSearch.toLowerCase())) &&
-    (role ? u.role === role : true)
-  );
-
-  const exportCSV = () => {
-    const rows = filtered;
-    if (!rows?.length) return;
-    const headers = ['name','email','role','is_active'];
-    const lines = [headers.join(',')].concat(rows.map(r => headers.map(h => JSON.stringify(r[h] ?? '')).join(',')));
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'users.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const openNew = () => { setEditing(null); setForm({ name: '', email: '', role: 'driver', is_active: true, password_hash: '', branch_id: '' }); setDialogOpen(true); };
-  const openEdit = (u) => { setEditing(u); setForm({ name: u.name, email: u.email, role: u.role, is_active: !!u.is_active, password_hash: '', branch_id: u.branch_id || '' }); setDialogOpen(true); };
-  const save = async () => {
-    try {
-      const name = requireString(form.name, 'Name');
-      const email = requireEmail(form.email);
-      const role = requireString(form.role, 'Role');
-      if (role !== 'driver' && !form.branch_id) { throw new Error('Branch is required for non-driver roles'); }
-      if (editing) {
-        await updateUser(editing.user_id, { name, email, role, is_active: !!form.is_active, branch_id: form.branch_id ? Number(form.branch_id) : null });
-      } else {
-        const plain = String(form.password_hash || '');
-        await createUser({
-          name,
-          email,
-          role,
-          is_active: !!form.is_active,
-          password_plain: plain,
-          created_by: 'admin',
-          company_id: window.companyId ? Number(window.companyId) : null,
-          branch_id: form.branch_id ? Number(form.branch_id) : null
-        });
-      }
-      setDialogOpen(false);
-      setEditing(null);
-      setForm({ name: '', email: '', role: 'driver', is_active: true, password_hash: '', branch_id: '' });
-      getCompanyUsers().then(({ data }) => setUsers(data || []));
-    } catch (e) {
-      alert(e?.message || 'Validation failed');
+      setLoading(true);
+      const { data, error, count } = await searchCompanyUsers({
+        search: activeFilters.search,
+        email: activeFilters.email,
+        page: pageIndex,
+        limit,
+      });
+      if (error) throw error;
+      setUsers(data || []);
+      setTotal(typeof count === 'number' ? count : (data || []).length);
+    } catch (error) {
+      enqueueSnackbar(error.message || 'Failed to load users', { variant: 'error' });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const openEmployee = (u) => { setEditing(u); setEmpOpen(true); };
-  const saveEmployee = async () => {
-    const payload = {
-      user_id: editing.user_id,
-      company_id: editing.company_id || window.companyId,
-      full_name: empForm.full_name || editing.name,
-      id_passport: empForm.id_passport || null,
-      address: empForm.address || null,
-      phone: empForm.phone || null,
-      emergency_contact: empForm.emergency_contact,
-      employer: empForm.employer,
-      job: empForm.job,
-      compensation: empForm.compensation,
-      leave_entitlements: empForm.leave_entitlements,
-      contract: empForm.contract,
-      other_terms: empForm.other_terms,
-    };
-    await window.supabase.from('employee_profiles').upsert(payload, { onConflict: 'user_id' });
-    setEmpOpen(false);
+  useEffect(() => {
+    loadUsers(0, rowsPerPage, filters);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, rowsPerPage]);
+
+  const validateForm = () => {
+    const nextErrors = {};
+    if (!form.name.trim()) nextErrors.name = 'Name is required';
+    if (!form.email.trim()) {
+      nextErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      nextErrors.email = 'Enter a valid email';
+    }
+    if (!form.role) nextErrors.role = 'Role is required';
+    if (!form.status) nextErrors.status = 'Status is required';
+    setFormErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
+  const handleCloseDialog = () => {
+    setDialogOpen(false);
+    setTargetUser(null);
+    setForm(initialForm);
+    setFormErrors({});
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+    setSaving(true);
+    try {
+      const payload = {
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        role: form.role,
+        branch: form.branch?.trim() || null,
+        status: form.status,
+      };
+      if (targetUser?.user_id) {
+        const { error } = await updateCompanyUser(targetUser.user_id, payload);
+        if (error) throw error;
+        enqueueSnackbar('User updated', { variant: 'success' });
+      } else {
+        const { error } = await createCompanyUser(payload);
+        if (error) throw error;
+        enqueueSnackbar('User created', { variant: 'success' });
+      }
+      handleCloseDialog();
+      loadUsers();
+    } catch (error) {
+      enqueueSnackbar(error.message || 'Unable to save user', { variant: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!targetUser?.user_id) return;
+    try {
+      setSaving(true);
+      const { error } = await deleteCompanyUser(targetUser.user_id);
+      if (error) throw error;
+      enqueueSnackbar('User deleted', { variant: 'success' });
+      setConfirmOpen(false);
+      setTargetUser(null);
+      loadUsers(page, rowsPerPage);
+    } catch (error) {
+      enqueueSnackbar(error.message || 'Failed to delete user', { variant: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const rowsWithFallback = useMemo(() => {
+    return (users || []).map((row) => ({
+      ...row,
+      status: row.status || (row.is_active ? 'Active' : 'Pending'),
+    }));
+  }, [users]);
+
   return (
-    <>
-      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-        <TextField label="Search Name" value={search} onChange={e => setSearch(e.target.value)} />
-        <TextField label="Search Email" value={emailSearch} onChange={e => setEmailSearch(e.target.value)} />
-        <Select value={role} onChange={e => setRole(e.target.value)} displayEmpty>
-          <MenuItem value="">All Roles</MenuItem>
-          <MenuItem value="driver">Driver</MenuItem>
-          <MenuItem value="booking_officer">Booking Office</MenuItem>
-          <MenuItem value="boarding_operator">Boarding Operator</MenuItem>
-          <MenuItem value="ops_manager">Operations Manager</MenuItem>
-          <MenuItem value="admin">Admin</MenuItem>
-        </Select>
-        {canEdit && <Button variant="contained" color="primary" onClick={openNew}>Add User</Button>}
-        <Button variant="outlined" onClick={exportCSV}>Export CSV</Button>
-      </Box>
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableCell>Name</TableCell>
-            <TableCell>Email</TableCell>
-            <TableCell>Role</TableCell>
-            <TableCell>Branch</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell>Actions</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((u) => (
-            <TableRow key={u.user_id}>
-              <TableCell>{u.name}</TableCell>
-              <TableCell>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <span>{u.email}</span>
-                  {!u.email_confirmed_at && (
-                    <Tooltip title="Verification pending">
-                      <Chip size="small" label="Pending" color="warning" />
-                    </Tooltip>
+    <Grid container spacing={2}>
+      <Grid item xs={12}>
+        <DashboardCard
+          title="User Management"
+          variant="outlined"
+          headerAction={(
+            <Button variant="contained" onClick={() => { setTargetUser(null); setForm(initialForm); setDialogOpen(true); }}>
+              Add User
+            </Button>
+          )}
+        >
+          <Stack spacing={2}>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+              <TextField
+                label="Search Name"
+                value={searchName}
+                onChange={(event) => setSearchName(event.target.value)}
+                fullWidth
+              />
+              <TextField
+                label="Search Email"
+                value={searchEmail}
+                onChange={(event) => setSearchEmail(event.target.value)}
+                fullWidth
+              />
+            </Stack>
+
+            <Paper variant="outlined">
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Email</TableCell>
+                    <TableCell>Role</TableCell>
+                    <TableCell>Branch</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center">
+                        <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} sx={{ py: 3 }}>
+                          <CircularProgress size={20} />
+                          <Typography variant="body2">Loading users…</Typography>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  ) : rowsWithFallback.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                        <Typography variant="body2" color="text.secondary">No users found</Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    rowsWithFallback.map((row) => (
+                      <TableRow key={row.user_id} hover>
+                        <TableCell>{row.name || '-'}</TableCell>
+                        <TableCell>{row.email || '-'}</TableCell>
+                        <TableCell sx={{ textTransform: 'capitalize' }}>{row.role || '-'}</TableCell>
+                        <TableCell>{row.branch || '-'}</TableCell>
+                        <TableCell>
+                          <Chip size="small" color={statusColor(row.status)} label={row.status || 'Pending'} />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="Reset Password">
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={async () => {
+                                  if (!row.email) return;
+                                  try {
+                                    const { error } = await resetUserPassword(row.email);
+                                    if (error) throw error;
+                                    enqueueSnackbar(`Password reset email sent to ${row.email}`, { variant: 'success' });
+                                  } catch (error) {
+                                    enqueueSnackbar(error.message || 'Failed to send password reset', { variant: 'error' });
+                                  }
+                                }}
+                              >
+                                <LockResetIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title="Edit">
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                setTargetUser(row);
+                                setForm({
+                                  name: row.name || '',
+                                  email: row.email || '',
+                                  role: row.role || 'driver',
+                                  branch: row.branch || '',
+                                  status: row.status || 'Pending',
+                                });
+                                setDialogOpen(true);
+                              }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                setTargetUser(row);
+                                setConfirmOpen(true);
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
                   )}
-                </Stack>
-              </TableCell>
-              <TableCell>{u.role}</TableCell>
-              <TableCell>{u.branch_id || '-'}</TableCell>
-              <TableCell>{u.is_active ? 'Active' : 'Inactive'}</TableCell>
-              <TableCell>
-                {canEdit && <Button size="small" variant="outlined" onClick={() => openEmployee(u)}>Actions</Button>}
-                {canEdit && <IconButton onClick={() => openEdit(u)}><EditIcon /></IconButton>}
-                {!u.email_confirmed_at && canEdit && (
-                  <Button size="small" onClick={async () => {
-                    try {
-                      const url = `${process.env.REACT_APP_SUPABASE_URL || ''}/functions/v1/admin_resend_invite`;
-                      await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(window.supabase && (await window.supabase.auth.getSession()).data?.session?.access_token) || ''}` }, body: JSON.stringify({ email: u.email }) });
-                    } catch {}
-                  }}>Resend invite</Button>
-                )}
-                {canEdit && <IconButton onClick={async () => { await deleteUser(u.user_id); try { await window.supabase.from('activity_log').insert([{ company_id: window.companyId, type: 'user_delete', message: JSON.stringify({ user_id: u.user_id, by: window.userId }) }]); } catch {} getCompanyUsers().then(({ data }) => setUsers(data || [])); }}><DeleteIcon /></IconButton>}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      <TablePagination
-        component="div"
-        count={filtered.length}
-        page={page}
-        onPageChange={(_, p) => setPage(p)}
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={e => setRowsPerPage(parseInt(e.target.value, 10))}
-      />
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)}>
-        <DialogTitle>{editing ? 'Edit User' : 'Add User'}</DialogTitle>
-        <DialogContent>
-          <TextField label="Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} fullWidth sx={{ mt: 1 }} />
-          <TextField label="Email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} fullWidth sx={{ mt: 2 }} />
-          <Select fullWidth value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} sx={{ mt: 2 }}>
-            <MenuItem value="driver">Driver</MenuItem>
-            <MenuItem value="booking_officer">Booking Office</MenuItem>
-            <MenuItem value="boarding_operator">Boarding Operator</MenuItem>
-            <MenuItem value="ops_manager">Operations Manager</MenuItem>
-          </Select>
-          <Select fullWidth value={form.branch_id} onChange={e => setForm(f => ({ ...f, branch_id: e.target.value }))} sx={{ mt: 2 }} displayEmpty>
-            <MenuItem value="">{form.role === 'driver' ? 'Branch (optional for drivers)' : 'Select Branch (required)'}</MenuItem>
-            {(branches||[]).map(b => <MenuItem key={b.branch_id} value={b.branch_id}>{b.name}</MenuItem>)}
-          </Select>
-          {!editing && <TextField label="Password" type="password" value={form.password_hash} onChange={e => setForm(f => ({ ...f, password_hash: e.target.value }))} fullWidth sx={{ mt: 2 }} helperText="In test mode, this is stored locally only" />}
-          <Select fullWidth value={form.is_active ? 'Active' : 'Inactive'} onChange={e => setForm(f => ({ ...f, is_active: e.target.value === 'Active' }))} sx={{ mt: 2 }}>
-            <MenuItem value="Active">Active</MenuItem>
-            <MenuItem value="Inactive">Inactive</MenuItem>
-          </Select>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          {canEdit && <Button variant="contained" onClick={save}>Save</Button>}
-        </DialogActions>
-      </Dialog>
+                </TableBody>
+              </Table>
+              <TablePagination
+                component="div"
+                count={total}
+                page={page}
+                onPageChange={(_, newPage) => {
+                  setPage(newPage);
+                  loadUsers(newPage, rowsPerPage, filters);
+                }}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={(event) => {
+                  const next = parseInt(event.target.value, 10);
+                  setRowsPerPage(next);
+                  setPage(0);
+                  loadUsers(0, next, filters);
+                }}
+                rowsPerPageOptions={[5, 10, 20]}
+              />
+            </Paper>
+          </Stack>
+        </DashboardCard>
+      </Grid>
 
-      <Dialog open={empOpen} onClose={() => setEmpOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Employee Details</DialogTitle>
-        <DialogContent>
+      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="xs" fullWidth>
+        <DialogTitle>{targetUser ? 'Edit User' : 'Add User'}</DialogTitle>
+        <DialogContent dividers>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <Divider>Employee details</Divider>
-            <TextField label="Full name" value={empForm.full_name} onChange={e => setEmpForm(f => ({ ...f, full_name: e.target.value }))} fullWidth />
-            <TextField label="ID/Passport" value={empForm.id_passport} onChange={e => setEmpForm(f => ({ ...f, id_passport: e.target.value }))} fullWidth />
-            <TextField label="Address" value={empForm.address} onChange={e => setEmpForm(f => ({ ...f, address: e.target.value }))} fullWidth />
-            <TextField label="Phone" value={empForm.phone} onChange={e => setEmpForm(f => ({ ...f, phone: e.target.value }))} fullWidth />
-            <Stack direction="row" spacing={2}>
-              <TextField label="Emergency Name" value={empForm.emergency_contact.name} onChange={e => setEmpForm(f => ({ ...f, emergency_contact: { ...f.emergency_contact, name: e.target.value } }))} fullWidth />
-              <TextField label="Relation" value={empForm.emergency_contact.relation} onChange={e => setEmpForm(f => ({ ...f, emergency_contact: { ...f.emergency_contact, relation: e.target.value } }))} fullWidth />
-              <TextField label="Phone" value={empForm.emergency_contact.phone} onChange={e => setEmpForm(f => ({ ...f, emergency_contact: { ...f.emergency_contact, phone: e.target.value } }))} fullWidth />
-            </Stack>
-
-            <Divider>Employer details</Divider>
-            <Stack direction="row" spacing={2}>
-              <TextField label="Company name" value={empForm.employer.company_name} onChange={e => setEmpForm(f => ({ ...f, employer: { ...f.employer, company_name: e.target.value } }))} fullWidth />
-              <TextField label="Registration #" value={empForm.employer.registration_no} onChange={e => setEmpForm(f => ({ ...f, employer: { ...f.employer, registration_no: e.target.value } }))} fullWidth />
-            </Stack>
-            <TextField label="Business address" value={empForm.employer.address} onChange={e => setEmpForm(f => ({ ...f, employer: { ...f.employer, address: e.target.value } }))} fullWidth />
-            <TextField label="Contact details" value={empForm.employer.contact} onChange={e => setEmpForm(f => ({ ...f, employer: { ...f.employer, contact: e.target.value } }))} fullWidth />
-
-            <Divider>Job details</Divider>
-            <Stack direction="row" spacing={2}>
-              <TextField label="Title/Position" value={empForm.job.title} onChange={e => setEmpForm(f => ({ ...f, job: { ...f.job, title: e.target.value } }))} fullWidth />
-              <TextField label="Location(s)" value={empForm.job.location} onChange={e => setEmpForm(f => ({ ...f, job: { ...f.job, location: e.target.value } }))} fullWidth />
-            </Stack>
-            <TextField label="Job description" value={empForm.job.description} onChange={e => setEmpForm(f => ({ ...f, job: { ...f.job, description: e.target.value } }))} fullWidth multiline minRows={2} />
-            <TextField label="Working hours" value={empForm.job.hours} onChange={e => setEmpForm(f => ({ ...f, job: { ...f.job, hours: e.target.value } }))} fullWidth />
-
-            <Divider>Compensation & benefits</Divider>
-            <Stack direction="row" spacing={2}>
-              <TextField label="Salary" value={empForm.compensation.salary} onChange={e => setEmpForm(f => ({ ...f, compensation: { ...f.compensation, salary: e.target.value } }))} fullWidth />
-              <TextField label="Frequency" value={empForm.compensation.frequency} onChange={e => setEmpForm(f => ({ ...f, compensation: { ...f.compensation, frequency: e.target.value } }))} fullWidth />
-              <TextField label="Overtime rate" value={empForm.compensation.overtime_rate} onChange={e => setEmpForm(f => ({ ...f, compensation: { ...f.compensation, overtime_rate: e.target.value } }))} fullWidth />
-            </Stack>
-            <TextField label="Bonuses/Commissions" value={empForm.compensation.bonuses} onChange={e => setEmpForm(f => ({ ...f, compensation: { ...f.compensation, bonuses: e.target.value } }))} fullWidth />
-            <TextField label="Benefits" value={empForm.compensation.benefits} onChange={e => setEmpForm(f => ({ ...f, compensation: { ...f.compensation, benefits: e.target.value } }))} fullWidth />
-
-            <Divider>Leave entitlements</Divider>
-            <Stack direction="row" spacing={2}>
-              <TextField label="Annual" value={empForm.leave_entitlements.annual} onChange={e => setEmpForm(f => ({ ...f, leave_entitlements: { ...f.leave_entitlements, annual: e.target.value } }))} fullWidth />
-              <TextField label="Sick" value={empForm.leave_entitlements.sick} onChange={e => setEmpForm(f => ({ ...f, leave_entitlements: { ...f.leave_entitlements, sick: e.target.value } }))} fullWidth />
-              <TextField label="Maternity" value={empForm.leave_entitlements.maternity} onChange={e => setEmpForm(f => ({ ...f, leave_entitlements: { ...f.leave_entitlements, maternity: e.target.value } }))} fullWidth />
-              <TextField label="Paternity" value={empForm.leave_entitlements.paternity} onChange={e => setEmpForm(f => ({ ...f, leave_entitlements: { ...f.leave_entitlements, paternity: e.target.value } }))} fullWidth />
-              <TextField label="Public holidays" value={empForm.leave_entitlements.public_holidays} onChange={e => setEmpForm(f => ({ ...f, leave_entitlements: { ...f.leave_entitlements, public_holidays: e.target.value } }))} fullWidth />
-            </Stack>
-
-            <Divider>Duration & termination</Divider>
-            <Stack direction="row" spacing={2}>
-              <TextField label="Type" value={empForm.contract.type} onChange={e => setEmpForm(f => ({ ...f, contract: { ...f.contract, type: e.target.value } }))} fullWidth />
-              <TextField label="Start date" type="date" InputLabelProps={{ shrink: true }} value={empForm.contract.start_date} onChange={e => setEmpForm(f => ({ ...f, contract: { ...f.contract, start_date: e.target.value } }))} fullWidth />
-              <TextField label="End date" type="date" InputLabelProps={{ shrink: true }} value={empForm.contract.end_date} onChange={e => setEmpForm(f => ({ ...f, contract: { ...f.contract, end_date: e.target.value } }))} fullWidth />
-              <TextField label="Notice period" value={empForm.contract.notice_period} onChange={e => setEmpForm(f => ({ ...f, contract: { ...f.contract, notice_period: e.target.value } }))} fullWidth />
-            </Stack>
-            <TextField label="Grounds for termination" value={empForm.contract.termination_grounds} onChange={e => setEmpForm(f => ({ ...f, contract: { ...f.contract, termination_grounds: e.target.value } }))} fullWidth />
-
-            <Divider>Other terms</Divider>
-            <TextField label="Disciplinary procedures" value={empForm.other_terms.disciplinary} onChange={e => setEmpForm(f => ({ ...f, other_terms: { ...f.other_terms, disciplinary: e.target.value } }))} fullWidth />
-            <TextField label="Dispute resolution" value={empForm.other_terms.dispute_resolution} onChange={e => setEmpForm(f => ({ ...f, other_terms: { ...f.other_terms, dispute_resolution: e.target.value } }))} fullWidth />
+            <TextField
+              label="Name"
+              value={form.name}
+              onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+              error={Boolean(formErrors.name)}
+              helperText={formErrors.name}
+              fullWidth
+            />
+            <TextField
+              label="Email"
+              type="email"
+              value={form.email}
+              onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
+              error={Boolean(formErrors.email)}
+              helperText={formErrors.email}
+              fullWidth
+            />
+            <FormControl fullWidth error={Boolean(formErrors.role)}>
+              <InputLabel id="user-role-label">Role</InputLabel>
+              <Select
+                labelId="user-role-label"
+                label="Role"
+                value={form.role}
+                onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value }))}
+              >
+                {roleOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Branch"
+              value={form.branch}
+              onChange={(event) => setForm((prev) => ({ ...prev, branch: event.target.value }))}
+              placeholder="Optional"
+              fullWidth
+            />
+            <FormControl fullWidth error={Boolean(formErrors.status)}>
+              <InputLabel id="user-status-label">Status</InputLabel>
+              <Select
+                labelId="user-status-label"
+                label="Status"
+                value={form.status}
+                onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))}
+              >
+                {statusOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEmpOpen(false)}>Close</Button>
-          {canEdit && <Button variant="contained" onClick={saveEmployee}>Save</Button>}
+          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button variant="contained" onClick={handleSubmit} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
         </DialogActions>
       </Dialog>
-    </>
+
+      <Dialog open={confirmOpen} onClose={() => { setConfirmOpen(false); setTargetUser(null); }}>
+        <DialogTitle>Delete user</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2">
+            Are you sure you want to delete {targetUser?.name || 'this user'}?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setConfirmOpen(false); setTargetUser(null); }}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={handleDelete} disabled={saving}>
+            {saving ? 'Deleting…' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Grid>
   );
 }

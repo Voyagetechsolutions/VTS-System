@@ -10,7 +10,12 @@ export default function RefundsTab() {
     const { data } = await supabase.from('refunds').select('id, booking_id, amount, status, created_at').eq('company_id', companyId).order('created_at', { ascending: false });
     setRows(data || []);
   };
-  useEffect(() => { load(); }, [companyId]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [companyId]);
   const process = async (row) => { await supabase.from('refunds').update({ status: 'completed' }).eq('id', row.id); load(); };
   return (
     <DashboardCard title="Refunds & Adjustments" variant="outlined">

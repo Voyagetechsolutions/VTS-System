@@ -37,7 +37,12 @@ export default function SettingsTab() {
     setSubscription(sub || null);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
 
   const save = async () => {
     setSaving(true);

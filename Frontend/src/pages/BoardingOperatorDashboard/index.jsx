@@ -36,7 +36,7 @@ export default function BoardingOperatorDashboard() {
   const [tab, setTab] = React.useState(0);
   useEffect(() => {
     const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole');
-    if (role && role !== 'boarding_operator') {
+    if (!role || role !== 'boarding_operator') {
       window.location.replace('/');
     }
   }, []);

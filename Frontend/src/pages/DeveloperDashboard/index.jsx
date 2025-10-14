@@ -7,6 +7,7 @@ import UsersDevTab from '../../components/developer/tabs/UsersDevTab';
 import FleetRoutesDevTab from '../../components/developer/tabs/FleetRoutesDevTab';
 import BookingsDevTab from '../../components/developer/tabs/BookingsDevTab';
 import BillingDevTab from '../../components/developer/tabs/BillingDevTab';
+import PlansDevTab from '../../components/developer/tabs/PlansDevTab';
 import MonitoringDevTab from '../../components/developer/tabs/MonitoringDevTab';
 import AnnouncementsDevTab from '../../components/developer/tabs/AnnouncementsDevTab';
 import SettingsDevTab from '../../components/developer/tabs/SettingsDevTab';
@@ -19,7 +20,7 @@ const tabList = [
   { label: 'Billing & Subscription', icon: 'revenue' },
   { label: 'Buses & Routes', icon: 'route' },
   { label: 'Bookings & Transactions', icon: 'bookings' },
-  { label: 'Billing & Subscriptions', icon: 'revenue' },
+  { label: 'Plans & Pricing', icon: 'revenue' },
   { label: 'Monitoring & Logs', icon: 'system' },
   { label: 'Announcements', icon: 'announcements' },
   { label: 'Settings', icon: 'settings' },
@@ -33,7 +34,7 @@ const tabComponents = [
   <BillingDevTab />,
   <FleetRoutesDevTab />,
   <BookingsDevTab />,
-  <BillingDevTab />,
+  <PlansDevTab />,
   <MonitoringDevTab />,
   <AnnouncementsDevTab />,
   <SettingsDevTab />,
@@ -42,6 +43,12 @@ const tabComponents = [
 
 export default function DeveloperDashboard() {
   const [tab, setTab] = React.useState(0);
+  React.useEffect(() => {
+    const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole');
+    if (!role || role !== 'developer') {
+      window.location.replace('/');
+    }
+  }, []);
   const navItems = tabList.map((item, idx) => ({ label: item.label, icon: item.icon, selected: tab === idx, onClick: () => setTab(idx) }));
   return (
     <SidebarLayout navItems={navItems} title="Developer">

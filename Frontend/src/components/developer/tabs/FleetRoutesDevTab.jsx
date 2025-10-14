@@ -42,7 +42,12 @@ export default function FleetRoutesDevTab() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
 
   const filteredBuses = buses.filter(b => (
     ((busPlate || '').trim() === '' ? true : (b.license_plate || '').toLowerCase().includes(busPlate.toLowerCase())) &&

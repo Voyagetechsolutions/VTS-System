@@ -45,7 +45,7 @@ export default function BookingsTab() {
   useEffect(() => { load(); }, []);
   useEffect(() => {
     const sub = subscribeToBookings(() => load());
-    return () => { try { sub.unsubscribe?.(); } catch {} };
+    return () => { try { sub.unsubscribe?.(); } catch (error) { console.warn('Subscription cleanup error:', error); } };
   }, []);
 
   const onRouteChange = async (route_id) => {
@@ -145,7 +145,7 @@ export default function BookingsTab() {
   };
   const downloadTicket = async (b) => {
     const jsPDF = await ensureJsPDF();
-    const base64 = await generateTicketPdfBase64(b);
+    await generateTicketPdfBase64(b);
     const doc = new jsPDF();
     // regenerate quickly for download
     doc.setFontSize(14);
@@ -312,7 +312,7 @@ export default function BookingsTab() {
               </Select>
               <Box display="flex" gap={1}>
                 <Button variant="contained" onClick={create}>Confirm Ticket</Button>
-                <Button onClick={async () => { const jsPDF = await ensureJsPDF(); window.print(); }}>Print Ticket</Button>
+                <Button onClick={async () => { await ensureJsPDF(); window.print(); }}>Print Ticket</Button>
                 <Button onClick={async () => { const guessed = form?.email || (customerMap.get(bookings[0]?.customer_id)?.email) || window.user?.email || ''; const promptEmail = prompt('Send to email:', guessed); if (promptEmail) await emailTicket(bookings[0], promptEmail); }}>Email Ticket</Button>
                 <Button onClick={async () => { if (bookings[0]) await downloadTicket(bookings[0]); }}>Download Ticket</Button>
               </Box>

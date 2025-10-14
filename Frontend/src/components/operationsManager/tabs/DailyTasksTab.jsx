@@ -1,31 +1,61 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Box, Paper, Typography, Stack, TextField, Button, Divider, List, ListItem, Checkbox, ListItemText } from '@mui/material';
-import { getActivityLog } from '../../../supabase/api';
+import { getCompanyUsers } from '../../../supabase/api';
 import { supabase } from '../../../supabase/client';
 
 export default function DailyTasksTab() {
   const [tasks, setTasks] = useState([]);
   const [task, setTask] = useState('');
 
-  const load = async () => {
-    const r = await getActivityLog({ types: ['task'] });
+  const load = useCallback(async () => {
+    const r = await supabase.from('daily_tasks').select('id, task, assigned_to, status, created_at').eq('company_id', window.companyId).order('created_at', { ascending: false });
     setTasks(r.data || []);
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [load]);
 
   const add = async () => {
     if (!task.trim()) return;
-    const payload = { company_id: window.companyId, type: 'task', message: JSON.stringify({ text: task, done: false }) };
-    await supabase.from('activity_log').insert([payload]);
-    setTask('');
-    load();
+    try { 
+      await supabase.from('daily_tasks').insert([{ company_id: window.companyId, task, assigned_to: 'unassigned', status: 'pending' }]); 
+      setTask(''); 
+      load(); 
+    } catch (error) { 
+      console.error('Failed to add task:', error); 
+    }
   };
 
-  const toggle = async (row) => {
-    let msg = {}; try { msg = JSON.parse(row.message || '{}'); } catch {}
-    msg.done = !msg.done;
-    await supabase.from('activity_log').update({ message: JSON.stringify(msg) }).eq('id', row.id);
-    load();
+  const complete = async (id) => { 
+    try { 
+      await supabase.from('daily_tasks').update({ status: 'completed' }).eq('id', id); 
+      load(); 
+    } catch (error) { 
+      console.error('Failed to complete task:', error); 
+    } 
+  };
+
+  const remove = async (id) => { 
+    try { 
+      await supabase.from('daily_tasks').delete().eq('id', id); 
+      load(); 
+    } catch (error) { 
+      console.error('Failed to remove task:', error); 
+    } 
+  };
+
+  const toggle = async (task) => {
+    try {
+      const newStatus = task.status === 'completed' ? 'pending' : 'completed';
+      await supabase.from('daily_tasks').update({ status: newStatus }).eq('id', task.id);
+      load();
+    } catch (error) {
+      console.error('Failed to toggle task:', error);
+    }
   };
 
   return (

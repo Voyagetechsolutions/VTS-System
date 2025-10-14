@@ -1,6 +1,5 @@
 import React from 'react';
-import { Paper, Box, Typography, IconButton, Divider, alpha } from '@mui/material';
-import { MoreVert as MoreVertIcon } from '@mui/icons-material';
+import {Typography, Box, Paper, Divider, alpha } from '@mui/material';
 import { Icon } from './IconMap';
 import theme from '../../styles/theme';
 

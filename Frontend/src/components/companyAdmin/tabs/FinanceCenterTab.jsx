@@ -14,15 +14,8 @@ function toCSV(rows) {
   return lines.join('\n');
 }
 
-export default function FinanceCenterTab() {
-  const [agg, setAgg] = useState({ byDay: [], byRoute: [], expenses: [] });
-  const [payments, setPayments] = useState([]);
-  const [bookings, setBookings] = useState([]);
-
-  const daySeries = useMemo(() => (agg.byDay || []).map(r => [r.date?.slice?.(0,10) || r.date, Number(r.amount||0)]), [agg.byDay]);
-  const routeSeries = useMemo(() => (agg.byRoute || []).map(r => ({ label: String(r.route_id||'Unknown'), value: Number(r.amount||0) })), [agg.byRoute]);
-
-  const LineChart = ({ data, width = 520, height = 200, color = '#1976d2' }) => {
+// LineChart component defined outside to avoid re-creation on each render
+const LineChart = ({ data, width = 520, height = 200, color = '#1976d2' }) => {
     if (!data.length) return <svg width={width} height={height} />;
     const values = data.map(([, v]) => v);
     const max = Math.max(1, ...values);
@@ -37,7 +30,15 @@ export default function FinanceCenterTab() {
         <polyline fill="none" stroke={color} strokeWidth="2" points={points} />
       </svg>
     );
-  };
+};
+
+export default function FinanceCenterTab() {
+  const [agg, setAgg] = useState({ byDay: [], byRoute: [], expenses: [] });
+  const [payments, setPayments] = useState([]);
+  const [bookings, setBookings] = useState([]);
+
+  const daySeries = useMemo(() => (agg.byDay || []).map(r => [r.date?.slice?.(0,10) || r.date, Number(r.amount||0)]), [agg.byDay]);
+  const routeSeries = useMemo(() => (agg.byRoute || []).map(r => ({ label: String(r.route_id||'Unknown'), value: Number(r.amount||0) })), [agg.byRoute]);
 
   const load = async () => {
     const [a, p, b] = await Promise.all([getFinanceAggregates(), getPaymentsGlobal(), getAllBookingsGlobal()]);
@@ -45,7 +46,12 @@ export default function FinanceCenterTab() {
     setPayments(p.data || []);
     setBookings(b.data || []);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
 
   const exportCSV = (rows, filename) => {
     const csv = toCSV(rows);

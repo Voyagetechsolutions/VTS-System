@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Grid, Paper, Typography, Box, Button, Stack, TextField } from '@mui/material';
+import { Box, Typography, TextField, Select, MenuItem } from '@mui/material';
 import DataTable from '../../common/DataTable';
 import { supabase } from '../../../supabase/client';
 import { subscribeToTrips } from '../../../supabase/realtime';
@@ -22,7 +22,14 @@ export default function RoutesManageTab() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); const sub = subscribeToTrips(load); return () => { try { sub.unsubscribe?.(); } catch {} } }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+    const sub = subscribeToTrips(load); 
+    return () => { try { sub.unsubscribe?.(); } catch (error) { console.warn('Subscription cleanup error:', error); } }; 
+  }, []);
 
   const filtered = trips.filter(t => (
     ((routeSearch || '').trim() === '' ? true : (t.route_name || '').toLowerCase().includes(routeSearch.toLowerCase())) &&
@@ -30,7 +37,7 @@ export default function RoutesManageTab() {
   ));
 
   const notify = async (title, body) => {
-    try { await Promise.all([createAnnouncement(title, body), sendMessage(body)]); } catch {}
+    try { await Promise.all([createAnnouncement(title, body), sendMessage(body)]); } catch (error) { console.warn('Notification error:', error); }
   };
 
   const reassign = async (row) => {

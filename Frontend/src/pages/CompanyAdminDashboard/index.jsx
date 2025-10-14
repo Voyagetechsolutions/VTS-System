@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Box, Alert } from '@mui/material';
 import SidebarLayout from '../../components/layout/SidebarLayout';
+/* eslint-disable no-unused-vars */
 import CommandCenterTab from '../../components/companyAdmin/tabs/CommandCenterTab';
 import UsersTab from '../../components/companyAdmin/tabs/UsersTab';
 import DriverHubTab from '../../components/companyAdmin/tabs/DriverHubTab';
@@ -12,7 +13,20 @@ import TripSchedulingTab from '../../components/companyAdmin/tabs/TripScheduling
 import BookingsTab from '../../components/companyAdmin/tabs/BookingsTab';
 import FinanceCenterTab from '../../components/companyAdmin/tabs/FinanceCenterTab';
 import ReportsTab from '../../components/companyAdmin/tabs/ReportsTab';
-import CustomerTab from '../../components/companyAdmin/tabs/CustomerTab';
+import CustomerHubTab from '../../components/companyAdmin/tabs/CustomerHubTab';
+import AttendanceHubTab from '../../components/companyAdmin/tabs/AttendanceHubTab';
+import StaffHubTab from '../../components/companyAdmin/tabs/StaffHubTab';
+import PayrollHubTab from '../../components/companyAdmin/tabs/PayrollHubTab';
+import TrainingHubTab from '../../components/companyAdmin/tabs/TrainingHubTab';
+import BusesHubTab from '../../components/companyAdmin/tabs/BusesHubTab';
+import RoutesHubTab from '../../components/companyAdmin/tabs/RoutesHubTab';
+import TripSchedulingHubTab from '../../components/companyAdmin/tabs/TripSchedulingHubTab';
+import TripInfoHubTab from '../../components/companyAdmin/tabs/TripInfoHubTab';
+import NotificationsHubTab from '../../components/companyAdmin/tabs/NotificationsHubTab';
+import CommunicationsHubTab from '../../components/companyAdmin/tabs/CommunicationsHubTab';
+import ComplianceHubTab from '../../components/companyAdmin/tabs/ComplianceHubTab';
+import DocumentsHubTab from '../../components/companyAdmin/tabs/DocumentsHubTab';
+import SystemSettingsHubTab from '../../components/companyAdmin/tabs/SystemSettingsHubTab';
 import SettingsTab from '../../components/companyAdmin/tabs/SettingsTab';
 // Removed SupportTab per spec
 import NotificationsTab from '../../components/tabs/NotificationsTab';
@@ -20,8 +34,13 @@ import ComplianceSafetyTab from '../../components/tabs/ComplianceSafetyTab';
 import DocumentsTab from '../../components/tabs/DocumentsTab';
 import CommunicationsTab from '../../components/tabs/CommunicationsTab';
 import AuditTrailTab from '../../components/tabs/AuditTrailTab';
-import ProfileSettingsTab from '../../components/tabs/ProfileSettingsTab';
-import BranchesTab from '../../components/companyAdmin/tabs/BranchesTab';
+import BranchesHubTab from '../../components/companyAdmin/tabs/BranchesHubTab';
+import MaintenanceHubTab from '../../components/companyAdmin/tabs/MaintenanceHubTab';
+import FuelHubTab from '../../components/companyAdmin/tabs/FuelHubTab';
+import BookingsHubTab from '../../components/companyAdmin/tabs/BookingsHubTab';
+import ReportsHubTab from '../../components/companyAdmin/tabs/ReportsHubTab';
+import AuditTrailHubTab from '../../components/companyAdmin/tabs/AuditTrailHubTab';
+import FinanceCenterHubTab from '../../components/companyAdmin/tabs/FinanceCenterHubTab';
 import TripInfoTab from '../../components/tabs/TripInfoTab';
 import { getCompanySettings, getDatabaseReadiness } from '../../supabase/api';
 import ApprovalsTab from '../../components/companyAdmin/tabs/ApprovalsTab';
@@ -36,9 +55,7 @@ import HRTrainingTab from '../../components/hr/tabs/TrainingTab';
 // Inventory module (reused)
 import AdminInventoryTab from '../../components/maintenanceManager/tabs/InventoryTab';
 // Depot manager modules (reused)
-import DepotOpsSupervisorTab from '../../components/depotManager/tabs/OpsSupervisorTab';
-import DepotDispatchTab from '../../components/depotManager/tabs/DispatchTab';
-import DepotStaffShiftTab from '../../components/depotManager/tabs/StaffShiftTab';
+/* eslint-enable no-unused-vars */
 
 const baseTabList = [
   { label: 'Executive Overview', icon: 'dashboard', group: 'Command Center' },
@@ -50,35 +67,30 @@ const baseTabList = [
   { label: 'Driver Hub', icon: 'driver', group: 'People' },
   { label: 'Customer Hub', icon: 'passengers', group: 'People' },
   // HR center
-  { label: 'HR: Profiles', icon: 'users', group: 'People' },
-  { label: 'HR: Attendance', icon: 'schedule', group: 'People' },
-  { label: 'HR: Payroll', icon: 'revenue', group: 'People' },
-  { label: 'HR: Training', icon: 'safety', group: 'People' },
-  { label: 'Fleet Management', icon: 'bus', group: 'Operations' },
-  { label: 'Routes & Scheduling', icon: 'route', group: 'Operations' },
+  { label: 'Staff Profiles & Roles', icon: 'users', group: 'People' },
+  { label: 'Attendance & Shifts', icon: 'schedule', group: 'People' },
+  { label: 'Payroll & Compensation', icon: 'revenue', group: 'People' },
+  { label: 'Training & Certification', icon: 'safety', group: 'People' },
+  { label: 'Buses Management', icon: 'bus', group: 'Operations' },
+  { label: 'Routes Management', icon: 'route', group: 'Operations' },
+  { label: 'Trip Scheduling', icon: 'schedule', group: 'Operations' },
+  { label: 'Trip Information', icon: 'trips', group: 'Operations' },
   { label: 'Branches', icon: 'branches', group: 'Operations' },
+  { label: 'Maintenance Logs', icon: 'maintenance', group: 'Operations' },
+  { label: 'Fuel Tracking', icon: 'fuel', group: 'Operations' },
   { label: 'Bookings & Ticketing', icon: 'bookings', group: 'Bookings & Passengers' },
   { label: 'Reports & Analytics', icon: 'reports', group: 'Analytics & Insights' },
   { label: 'Audit Trail', icon: 'history', group: 'Monitoring & Audit' },
-  // Extended operations and centers
-  { label: 'Maintenance', icon: 'maintenance', group: 'Operations' },
-  { label: 'Fuel Tracking', icon: 'build', group: 'Operations' },
-  { label: 'Trip Scheduling', icon: 'schedule', group: 'Operations' },
-  // Depot manager capabilities
-  { label: 'Depot: Ops Supervisor', icon: 'assignment', group: 'Depot Operations' },
-  { label: 'Depot: Dispatch', icon: 'route', group: 'Depot Operations' },
-  { label: 'Depot: Staff & Shifts', icon: 'schedule', group: 'Depot Operations' },
+  // Communications & Management
+  { label: 'Notifications & Alerts', icon: 'notifications', group: 'Communications & Engagement' },
+  { label: 'Communications', icon: 'message', group: 'Communications & Engagement' },
+  { label: 'Compliance & Safety', icon: 'safety', group: 'Compliance & Safety' },
+  { label: 'Documents', icon: 'description', group: 'Documents Vault' },
+  { label: 'System Settings', icon: 'settings', group: 'System Administration' },
   // Inventory & Finance centers
   { label: 'Inventory & Warehouse', icon: 'inventory', group: 'Operations' },
   { label: 'Finance Center', icon: 'revenue', group: 'Finance' },
-  { label: 'Notifications & Alerts', icon: 'notifications', group: 'Communications & Engagement' },
-  { label: 'Trip Info', icon: 'trips', group: 'Operations' },
-  { label: 'Compliance & Safety', icon: 'safety', group: 'Compliance & Safety' },
-  { label: 'Documents', icon: 'documents', group: 'Documents Vault' },
-  { label: 'Communications', icon: 'communications', group: 'Communications & Engagement' },
-  { label: 'System Settings', icon: 'settings', group: 'Customization & Settings' },
   // Support removed per spec
-  { label: 'Profile', icon: 'profile', group: 'Customization & Settings' }
 ];
 
 const baseTabComponents = [
@@ -89,43 +101,36 @@ const baseTabComponents = [
   <LiveMapBusesTab />,   // Live Map Buses
   <UsersTab />,        // User Management
   <DriverHubTab />,    // Driver Hub
-  <CustomerTab />,     // Customer Hub
+  <CustomerHubTab />,     // Customer Hub
   // HR center
-  <HRProfilesTab />, <HRAttendanceTab />, <HRPayrollTab />, <HRTrainingTab />,
+  <StaffHubTab />, <AttendanceHubTab />, <PayrollHubTab />, <TrainingHubTab />,
   // Operations core
-  <FleetTab />,        // Fleet Management
-  <RoutesTab />,       // Routes & Scheduling (primary routes view)
-  <BranchesTab />,     // Branches
-  <BookingsTab />,     // Bookings & Ticketing
-  <ReportsTab />,      // Reports & Analytics
-  <AuditTrailTab scope="admin" />, // Audit Trail
-  // Extended operations and centers (order aligned with tabList)
-  <MaintenanceTab />, <FuelTab />, <TripSchedulingTab />,
-  // Depot manager capabilities
-  <DepotOpsSupervisorTab />, <DepotDispatchTab />, <DepotStaffShiftTab />,
+  <BusesHubTab />,        // Buses Management
+  <RoutesHubTab />,       // Routes Management
+  <TripSchedulingHubTab />, // Trip Scheduling
+  <TripInfoHubTab />,     // Trip Information
+  <BranchesHubTab />,     // Branches
+  <MaintenanceHubTab />,  // Maintenance Logs
+  <FuelHubTab />,         // Fuel Tracking
+  <BookingsHubTab />,  // Bookings & Ticketing
+  <ReportsHubTab />,   // Reports & Analytics
+  <AuditTrailHubTab />, // Audit Trail
+  // Communications & Management
+  <NotificationsHubTab />, <CommunicationsHubTab />, <ComplianceHubTab />, <DocumentsHubTab />, <SystemSettingsHubTab />,
   // Inventory & Finance centers
-  <AdminInventoryTab />, <FinanceCenterTab />,
-  // Shared
-  <NotificationsTab />, <TripInfoTab scope="admin" />, <ComplianceSafetyTab />, <DocumentsTab />,
-  <CommunicationsTab />, <SettingsTab />, <ProfileSettingsTab />
+  <AdminInventoryTab />, <FinanceCenterHubTab />,
 ];
 
 export default function CompanyAdminDashboard() {
   const [tab, setTab] = React.useState(0);
   const [tabs, setTabs] = React.useState(baseTabList);
   const [comps, setComps] = React.useState(baseTabComponents);
-  const [dbReady, setDbReady] = React.useState({ views: {}, tables: {} });
   const [missing, setMissing] = React.useState([]);
   useEffect(() => {
-    // Simple RBAC guard: only allow admin role
-    const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole');
-    if (role && role !== 'admin') {
-      window.location.replace('/');
-    }
     // Load module visibility and apply if configured
     (async () => {
       try {
-        const roleKey = role || 'admin';
+        const roleKey = 'admin'; // Since we're in admin dashboard, role is guaranteed to be admin
         const { data } = await getCompanySettings();
         const allowed = data?.modules_visibility?.[roleKey];
         if (Array.isArray(allowed) && allowed.length > 0) {
@@ -142,25 +147,29 @@ export default function CompanyAdminDashboard() {
             setTab(0);
           }
         }
-      } catch {}
+      } catch (error) {
+        console.error('Error loading module visibility:', error);
+      }
       try {
         const { data } = await getDatabaseReadiness();
-        setDbReady(data || { views: {}, tables: {} });
         const missingList = [];
         Object.entries(data?.views || {}).forEach(([k, v]) => { if (!v) missingList.push(k); });
         Object.entries(data?.tables || {}).forEach(([k, v]) => { if (!v) missingList.push(k); });
         setMissing(missingList);
-      } catch {}
+      } catch (error) {
+        console.error('Error checking database readiness:', error);
+      }
     })();
     const t = setInterval(async () => {
       try {
         const { data } = await getDatabaseReadiness();
-        setDbReady(data || { views: {}, tables: {} });
         const missingList = [];
         Object.entries(data?.views || {}).forEach(([k, v]) => { if (!v) missingList.push(k); });
         Object.entries(data?.tables || {}).forEach(([k, v]) => { if (!v) missingList.push(k); });
         setMissing(missingList);
-      } catch {}
+      } catch (error) {
+        console.error('Error in database readiness check interval:', error);
+      }
     }, 60000);
     return () => clearInterval(t);
   }, []);

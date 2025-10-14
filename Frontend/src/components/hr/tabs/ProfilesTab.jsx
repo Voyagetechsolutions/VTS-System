@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Card, CardContent, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControl, InputLabel, Select, MenuItem, Chip, IconButton, Avatar, Grid, Switch, FormControlLabel } from '@mui/material';
-import { Add as AddIcon, Visibility as VisibilityIcon, Edit as EditIcon, Pause as PauseIcon, LockReset as LockResetIcon, FileUpload as FileUploadIcon } from '@mui/icons-material';
+import { Box, Card, CardContent, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControl, InputLabel, Select, MenuItem, Chip, Avatar, Grid } from '@mui/material';
+import { Add as AddIcon, Visibility as VisibilityIcon, Edit as EditIcon, LockReset as LockResetIcon, FileUpload as FileUploadIcon, Pause as PauseIcon } from '@mui/icons-material';
 import DataTable from '../../common/DataTable';
 import { supabase } from '../../../supabase/client';
 

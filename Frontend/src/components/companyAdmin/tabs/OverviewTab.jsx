@@ -18,6 +18,7 @@ import PieChart from '../charts/PieChart';
 import LineChart from '../charts/LineChart';
 import { getCompanyKPIs, getGlobalActivity, getSystemHealth, getTopRoutes, getBusiestDepots, getMaintenanceAlerts } from '../../../supabase/api';
 import { supabase } from '../../../supabase/client';
+import QuickActionsModals from '../dialogs/QuickActionsModals';
 
 // Company Admin Executive Control Center - Meta Dashboard
 export default function OverviewTab() {
@@ -349,21 +350,45 @@ export default function OverviewTab() {
         </Card>
       </Box>
 
-      {/* Quick Actions - updated per spec */}
+      {/* Quick Actions */}
       <Box mt={4}>
         <Typography variant="h6" gutterBottom>Quick Actions</Typography>
-        <Stack direction="row" spacing={2} flexWrap="wrap">
-          <Button variant="contained" color="secondary" startIcon={<DirectionsBusFilledIcon />} onClick={() => window.dispatchEvent(new CustomEvent('open-add-bus-to-route'))}>
-            Add Bus to Route
+        <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+          <Button 
+            variant="contained" 
+            color="secondary" 
+            startIcon={<DirectionsBusFilledIcon />} 
+            onClick={() => window.dispatchEvent(new CustomEvent('open-add-bus-to-route'))}
+            sx={{ mb: 1 }}
+          >
+            + Add Bus to Route
           </Button>
-          <Button variant="contained" color="success" startIcon={<RouteIcon />} onClick={() => window.dispatchEvent(new CustomEvent('open-add-route'))}>
-            Add Route
+          <Button 
+            variant="contained" 
+            color="success" 
+            startIcon={<RouteIcon />} 
+            onClick={() => window.dispatchEvent(new CustomEvent('open-add-route'))}
+            sx={{ mb: 1 }}
+          >
+            + Add Route
           </Button>
-          <Button variant="contained" color="primary" startIcon={<PeopleIcon />} onClick={() => window.dispatchEvent(new CustomEvent('open-assign-driver'))}>
-            Assign Driver
+          <Button 
+            variant="contained" 
+            color="primary" 
+            startIcon={<PeopleIcon />} 
+            onClick={() => window.dispatchEvent(new CustomEvent('open-assign-driver'))}
+            sx={{ mb: 1 }}
+          >
+            + Assign Driver
           </Button>
-          <Button variant="contained" color="warning" startIcon={<PaidIcon />} onClick={() => window.location.assign('#/admin/refunds')}>
-            Pending Refunds
+          <Button 
+            variant="contained" 
+            color="warning" 
+            startIcon={<DirectionsBusFilledIcon />} 
+            onClick={() => window.dispatchEvent(new CustomEvent('open-add-bus'))}
+            sx={{ mb: 1 }}
+          >
+            + Add Bus
           </Button>
         </Stack>
       </Box>
@@ -381,6 +406,9 @@ export default function OverviewTab() {
           </Grid>
         </Grid>
       </Box>
+
+      {/* Quick Actions Modals */}
+      <QuickActionsModals />
     </Box>
   );
 }

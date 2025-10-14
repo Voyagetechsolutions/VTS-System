@@ -5,7 +5,9 @@ import DataTable from '../../common/DataTable';
 export default function NotificationsTab() {
   const [rows, setRows] = useState([]);
   useEffect(() => {
-    setRows([{ created_at: new Date().toISOString(), type: 'hr', message: 'Example HR alert' }]);
+    setTimeout(() => {
+      setRows([{ created_at: new Date().toISOString(), type: 'hr', message: 'Example HR alert' }]);
+    }, 0);
   }, []);
   return (
     <DashboardCard title="Notifications & Alerts" variant="outlined">

@@ -15,7 +15,12 @@ export default function TaxComplianceTab() {
     const { data } = await q.order('period', { ascending: false });
     setRows(data||[]);
   };
-  useEffect(() => { load(); }, [companyId, region]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [companyId, region]);
 
   return (
     <DashboardCard title="Taxation & Compliance" variant="outlined">

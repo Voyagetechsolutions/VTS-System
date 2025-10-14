@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Paper, Typography, Button } from '@mui/material';
+import { Box, Typography, Button } from '@mui/material';
 import { supabase } from '../../../supabase/client';
 import BarChart from '../../charts/BarChart';
 

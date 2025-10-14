@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Paper, Typography, Stack, TextField, Button, Alert } from '@mui/material';
-import { searchBookings, checkInBooking, getPassengerManifest } from '../../../supabase/api';
+import { searchBookings, checkInBooking } from '../../../supabase/api';
 
 export default function CheckInTab() {
   const [q, setQ] = useState('');

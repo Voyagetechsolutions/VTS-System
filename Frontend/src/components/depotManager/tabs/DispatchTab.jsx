@@ -29,7 +29,12 @@ export default function DispatchTab() {
       setPassengers(pax);
     } catch {}
   };
-  useEffect(() => { load(); }, [companyId]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [companyId]);
 
   const doAssign = async () => {
     if (!assign.trip_id) return;

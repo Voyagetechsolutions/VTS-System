@@ -13,4 +13,4 @@ if (!supabaseUrl || !supabaseKey) {
 
 // Create client and expose globally for convenience where window.supabase is referenced
 export const supabase = createClient(supabaseUrl, supabaseKey);
-try { if (typeof window !== 'undefined') { window.supabase = supabase; } } catch {}
+try { if (typeof window !== 'undefined') { window.supabase = supabase; } } catch (error) { console.warn('Supabase client error:', error); }

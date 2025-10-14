@@ -42,7 +42,7 @@ export default function DepotManagerDashboard() {
   const [tab, setTab] = React.useState(0);
   useEffect(() => {
     const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole');
-    if (role && role !== 'depot_manager') {
+    if (!role || role !== 'depot_manager') {
       window.location.replace('/');
     }
   }, []);

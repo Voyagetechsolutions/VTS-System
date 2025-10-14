@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box } from '@mui/material';
 import SidebarLayout from '../../components/layout/SidebarLayout';
 import OverviewTab from '../../components/operationsManager/tabs/OverviewTab';
@@ -59,10 +59,10 @@ const tabComponents = [
 ];
 
 export default function OperationsManagerDashboard() {
-  const [tab, setTab] = React.useState(0);
+  const [tab, setTab] = useState(0);
   useEffect(() => {
     const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole');
-    if (role && role !== 'ops_manager' && role !== 'operations_manager') {
+    if (!role || (role !== 'ops_manager' && role !== 'operations_manager')) {
       window.location.replace('/');
     }
   }, []);

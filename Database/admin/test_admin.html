@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VTS Admin System Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2563eb;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background-color: #f9fafb;
+        }
+        button {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #1d4ed8;
+        }
+        button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        .success {
+            color: #059669;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc2626;
+            font-weight: bold;
+        }
+        .warning {
+            color: #d97706;
+            font-weight: bold;
+        }
+        .info {
+            color: #2563eb;
+            font-weight: bold;
+        }
+        #output {
+            background-color: #1f2937;
+            color: #f3f4f6;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            max-height: 500px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .credentials {
+            background-color: #fef3c7;
+            border: 1px solid #f59e0b;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .setup-steps {
+            background-color: #dbeafe;
+            border: 1px solid #3b82f6;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .setup-steps ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .setup-steps li {
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 VTS Admin System Test</h1>
+        
+        <div class="test-section">
+            <h3>📋 Your Supabase Configuration</h3>
+            <p><strong>URL:</strong> https://vtfxizyghgvxnllnapyi.supabase.co</p>
+            <p><strong>Project:</strong> vtfxizyghgvxnllnapyi</p>
+            <p><strong>Status:</strong> <span id="connectionStatus">Not tested</span></p>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Connection Tests</h3>
+            <button onclick="testConnection()">Test Supabase Connection</button>
+            <button onclick="testAdminTables()">Check Admin Tables</button>
+            <button onclick="testAdminLogin()" id="loginBtn" disabled>Test Admin Login</button>
+            <button onclick="clearOutput()">Clear Output</button>
+        </div>
+
+        <div class="credentials">
+            <h4>🔑 Default Admin Credentials (after setup)</h4>
+            <p><strong>Super Admin:</strong> admin@vtssystem.com / VTS@Admin2024!</p>
+            <p><strong>Company Admin:</strong> admin@metrobuslines.com / Metro@2024!</p>
+            <p><em>⚠️ Change these passwords after first login!</em></p>
+        </div>
+
+        <div class="setup-steps">
+            <h4>📝 Setup Instructions</h4>
+            <ol>
+                <li>Open your <a href="https://supabase.com/dashboard/project/vtfxizyghgvxnllnapyi" target="_blank">Supabase Dashboard</a></li>
+                <li>Go to SQL Editor → New Query</li>
+                <li>Execute these files in order:
+                    <ul>
+                        <li>01_admin_tables.sql</li>
+                        <li>02_admin_functions.sql</li>
+                        <li>04_admin_rls_policies.sql</li>
+                        <li>06_setup_admin_system.sql</li>
+                    </ul>
+                </li>
+                <li>Come back and test the connection!</li>
+            </ol>
+        </div>
+
+        <div id="output"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Initialize Supabase client
+        const { createClient } = supabase;
+        const supabaseClient = createClient(
+            'https://vtfxizyghgvxnllnapyi.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZnhpenlnaGd2eG5sbG5hcHlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzMDgxNDEsImV4cCI6MjA3MTg4NDE0MX0.wFXRm16eLQYYDO_d4SvOdpH3VSE9nCPIQxnNQ9Bd4Gc'
+        );
+
+        let adminTablesExist = false;
+
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info';
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = '';
+        }
+
+        async function testConnection() {
+            log('🔌 Testing Supabase connection...', 'info');
+            
+            try {
+                const { data, error } = await supabaseClient
+                    .from('information_schema.tables')
+                    .select('table_name')
+                    .eq('table_schema', 'public')
+                    .limit(20);
+
+                if (error) {
+                    log(`❌ Connection failed: ${error.message}`, 'error');
+                    document.getElementById('connectionStatus').innerHTML = '<span class="error">Failed</span>';
+                    return false;
+                }
+
+                log(`✅ Connected successfully! Found ${data.length} tables`, 'success');
+                document.getElementById('connectionStatus').innerHTML = '<span class="success">Connected</span>';
+                
+                // List some tables
+                if (data.length > 0) {
+                    log(`📋 Available tables: ${data.map(t => t.table_name).join(', ')}`, 'info');
+                }
+
+                return true;
+            } catch (error) {
+                log(`❌ Connection error: ${error.message}`, 'error');
+                document.getElementById('connectionStatus').innerHTML = '<span class="error">Error</span>';
+                return false;
+            }
+        }
+
+        async function testAdminTables() {
+            log('🔍 Checking for admin tables...', 'info');
+            
+            try {
+                const { data, error } = await supabaseClient
+                    .from('information_schema.tables')
+                    .select('table_name')
+                    .eq('table_schema', 'public')
+                    .in('table_name', ['admin_users', 'admin_sessions', 'admin_activity_log', 'companies', 'staff', 'buses']);
+
+                if (error) {
+                    log(`❌ Table check failed: ${error.message}`, 'error');
+                    return false;
+                }
+
+                const adminTables = ['admin_users', 'admin_sessions', 'admin_activity_log'];
+                const vtsTables = ['companies', 'staff', 'buses'];
+                
+                const foundAdminTables = data.filter(t => adminTables.includes(t.table_name));
+                const foundVtsTables = data.filter(t => vtsTables.includes(t.table_name));
+
+                log(`📊 Admin tables found: ${foundAdminTables.length}/3`, foundAdminTables.length === 3 ? 'success' : 'warning');
+                if (foundAdminTables.length > 0) {
+                    log(`   Tables: ${foundAdminTables.map(t => t.table_name).join(', ')}`, 'info');
+                }
+
+                log(`📊 VTS tables found: ${foundVtsTables.length}/3`, foundVtsTables.length > 0 ? 'success' : 'warning');
+                if (foundVtsTables.length > 0) {
+                    log(`   Tables: ${foundVtsTables.map(t => t.table_name).join(', ')}`, 'info');
+                }
+
+                adminTablesExist = foundAdminTables.length === 3;
+                document.getElementById('loginBtn').disabled = !adminTablesExist;
+
+                if (adminTablesExist) {
+                    log('✅ Admin system appears to be set up!', 'success');
+                } else {
+                    log('⚠️  Admin tables missing. Please run the setup SQL files.', 'warning');
+                }
+
+                return adminTablesExist;
+            } catch (error) {
+                log(`❌ Table check error: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testAdminLogin() {
+            if (!adminTablesExist) {
+                log('⚠️  Admin tables not found. Run table check first.', 'warning');
+                return;
+            }
+
+            log('👤 Testing admin login...', 'info');
+            
+            try {
+                const { data, error } = await supabaseClient.rpc('authenticate_admin_user', {
+                    p_email: 'admin@vtssystem.com',
+                    p_password: 'VTS@Admin2024!'
+                });
+
+                if (error) {
+                    log(`❌ Login function error: ${error.message}`, 'error');
+                    log('   Make sure you\'ve run 02_admin_functions.sql', 'warning');
+                    return false;
+                }
+
+                if (data && data.length > 0) {
+                    const admin = data[0];
+                    log('✅ Admin login successful!', 'success');
+                    log(`   Admin ID: ${admin.admin_id}`, 'info');
+                    log(`   Name: ${admin.full_name}`, 'info');
+                    log(`   Role: ${admin.role}`, 'info');
+                    log(`   Company: ${admin.company_id || 'Super Admin'}`, 'info');
+                    log(`   Session Token: ${admin.session_token.substring(0, 20)}...`, 'info');
+                    
+                    // Test session validation
+                    log('🔐 Testing session validation...', 'info');
+                    const { data: sessionData, error: sessionError } = await supabaseClient.rpc('validate_admin_session', {
+                        p_session_token: admin.session_token
+                    });
+
+                    if (sessionError) {
+                        log(`⚠️  Session validation error: ${sessionError.message}`, 'warning');
+                    } else if (sessionData && sessionData.length > 0) {
+                        log('✅ Session validation successful!', 'success');
+                    } else {
+                        log('⚠️  Session validation failed', 'warning');
+                    }
+
+                    return true;
+                } else {
+                    log('❌ Login failed - no data returned', 'error');
+                    log('   Make sure you\'ve run 06_setup_admin_system.sql', 'warning');
+                    return false;
+                }
+            } catch (error) {
+                log(`❌ Login test error: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        // Auto-test connection on page load
+        window.addEventListener('load', () => {
+            log('🚀 VTS Admin System Test Page Loaded', 'info');
+            log('Click "Test Supabase Connection" to begin', 'info');
+        });
+    </script>
+</body>
+</html>

@@ -49,12 +49,6 @@ export default function GlobalCommunicationsTab() {
     template: ''
   });
 
-  useEffect(() => {
-    loadData();
-    const t = setInterval(loadData, 30000);
-    return () => clearInterval(t);
-  }, []);
-
   const loadData = async () => {
     try {
       const [announcementsRes, policiesRes, templatesRes, channelsRes] = await Promise.all([
@@ -83,6 +77,15 @@ export default function GlobalCommunicationsTab() {
       console.error('Failed to load communications data:', error);
     }
   };
+
+  useEffect(() => {
+    const load = async () => {
+      await loadData();
+    };
+    load();
+    const t = setInterval(loadData, 30000);
+    return () => clearInterval(t);
+  }, []);
 
   const handleSendAnnouncement = async () => {
     try {

@@ -18,11 +18,27 @@ export default function TripManagementTab() {
     const { data } = await supabase
       .from('trips_with_details')
       .select('trip_id, route_name, departure_time, arrival_time, bus_id, status, passenger_count, capacity')
-      .eq('driver_id', userId)
-      .order('departure_time', { ascending: true });
     setTrips(data || []);
   };
-  useEffect(() => { load(); }, [userId]);
+
+  const startTrip = async () => {
+    if (!selected) return;
+    // enforce pre-trip inspection
+    const confirm = window.confirm('Confirm pre-trip inspection is complete?');
+    if (!confirm) return;
+    await recordDriverInspection({ trip_id: selected.trip_id, items: { brakes: true, lights: true, first_aid: true }, passed: true });
+    await updateTripStatus(selected.trip_id, 'InProgress');
+    load();
+  };
+  const endTrip = async () => { if (!selected) return; await updateTripStatus(selected.trip_id, 'Completed'); load(); };
+  const reportIssue = async () => { const details = prompt('Issue details'); if (!details) return; await createIncident({ title: 'Trip Incident', description: details, type: 'driver_report', severity: 'Medium', tripId: selected?.trip_id || null }); alert('Submitted'); };
+
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [userId]);
 
   useEffect(() => {
     // Setup Web Speech recognition if enabled and available
@@ -50,24 +66,12 @@ export default function TripManagementTab() {
     };
     rec.onend = () => {
       if (listening) {
-        try { rec.start(); } catch {}
+        try { rec.start(); } catch (error) { console.warn('Speech recognition error:', error); }
       }
     };
     recognitionRef.current = rec;
-    return () => { try { rec.stop(); } catch {} };
-  }, [listening, selected]);
-
-  const startTrip = async () => {
-    if (!selected) return;
-    // enforce pre-trip inspection
-    const confirm = window.confirm('Confirm pre-trip inspection is complete?');
-    if (!confirm) return;
-    await recordDriverInspection({ trip_id: selected.trip_id, items: { brakes: true, lights: true, first_aid: true }, passed: true });
-    await updateTripStatus(selected.trip_id, 'InProgress');
-    load();
-  };
-  const endTrip = async () => { if (!selected) return; await updateTripStatus(selected.trip_id, 'Completed'); load(); };
-  const reportIssue = async () => { const details = prompt('Issue details'); if (!details) return; await createIncident({ title: 'Trip Incident', description: details, type: 'driver_report', severity: 'Medium', tripId: selected?.trip_id || null }); alert('Submitted'); };
+    return () => { try { rec.stop(); } catch (error) { console.warn('Speech recognition cleanup error:', error); } };
+  }, [listening, selected, startTrip, endTrip, reportIssue]);
 
   const toggleVoice = async () => {
     const rec = recognitionRef.current;

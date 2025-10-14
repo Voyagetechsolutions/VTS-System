@@ -14,7 +14,12 @@ export default function VehicleInfoTab() {
       if (!error) setBus(data || null);
     } catch { setBus(null); }
   };
-  useEffect(() => { load(); }, [userId]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [userId]);
 
   const reportIssue = async () => {
     const details = prompt('Vehicle issue details');

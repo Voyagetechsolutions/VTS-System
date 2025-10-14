@@ -8,7 +8,12 @@ export default function PerformanceTab() {
   const [rows, setRows] = useState([]);
   const companyId = window.companyId || localStorage.getItem('companyId');
   const load = async () => { const { data } = await supabase.from('performance_reviews').select('id, staff_id, reviewer_id, period, rating, feedback, created_at').eq('company_id', companyId).order('created_at', { ascending: false }); setRows(data||[]); };
-  useEffect(() => { load(); }, [companyId]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [companyId]);
   return (
     <DashboardCard title="Performance Management" variant="outlined" headerAction={<ModernButton icon="add" onClick={async ()=>{
       const staff = window.prompt('Staff user_id');

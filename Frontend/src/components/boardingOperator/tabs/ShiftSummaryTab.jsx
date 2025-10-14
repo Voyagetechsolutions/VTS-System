@@ -15,25 +15,28 @@ export default function ShiftSummaryTab() {
   const [manifest, setManifest] = useState([]);
   const companyId = window.companyId || localStorage.getItem('companyId') || null;
 
-  const load = async () => {
-    const start = new Date(); start.setHours(0,0,0,0);
-    const end = new Date(); end.setHours(23,59,59,999);
-    const [{ data: bks }, { data: trips }] = await Promise.all([
-      supabase.from('bookings').select('booking_id, trip_id, status').eq('company_id', companyId).gte('booking_date', start.toISOString()).lte('booking_date', end.toISOString()),
-      supabase.from('trips_with_details').select('trip_id, bus_id, route_name, passenger_count, capacity, departure_time').eq('company_id', companyId).gte('departure_time', start.toISOString()).lte('departure_time', end.toISOString()),
-    ]);
-    const boarded = (bks||[]).filter(b => String(b.status||'').toLowerCase() === 'checked-in').length;
-    const expected = (bks||[]).length;
-    setSummary({ boarded, noShows: Math.max(0, expected - boarded), departures: (trips||[]).length });
-    const manifestRows = (trips||[]).map(t => {
-      const pct = t.capacity ? Math.round(((t.passenger_count||0)/t.capacity)*100) : 0;
-      let level = 'green';
-      if (pct < 40) level = 'red'; else if (pct < 80) level = 'yellow';
-      return { trip: t.trip_id, bus: t.bus_id, passengers: Number(t.passenger_count||0), occupancy_pct: pct, level };
-    });
-    setManifest(manifestRows);
-  };
-  useEffect(() => { load(); }, [companyId]);
+  useEffect(() => {
+    const loadData = async () => {
+      const start = new Date(); start.setHours(0,0,0,0);
+      const end = new Date(); end.setHours(23,59,59,999);
+      const [{ data: bks }, { data: trips }] = await Promise.all([
+        supabase.from('bookings').select('*').gte('created_at', start.toISOString()).lte('created_at', end.toISOString()),
+        supabase.from('trips').select('*').gte('departure_time', start.toISOString()).lte('departure_time', end.toISOString())
+      ]);
+      const boarded = (bks||[]).filter(b => b.status === 'boarded').length;
+      const noShows = (bks||[]).filter(b => b.status === 'no_show').length;
+      const departures = (trips||[]).length;
+      setSummary({ boarded, noShows, departures });
+      setManifest((bks||[]).map(b => ({ 
+        trip: b.trip_id, 
+        bus: b.bus_id, 
+        passengers: 1, 
+        occupancy_pct: 0, 
+        level: b.status 
+      })));
+    };
+    loadData();
+  }, [companyId]);
 
   const exportCSV = () => {
     const csv = toCSV(manifest);

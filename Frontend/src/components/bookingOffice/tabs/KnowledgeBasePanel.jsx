@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Paper, Typography, List, ListItem, ListItemText } from '@mui/material';
+import { Paper, Typography, List, ListItem, ListItemText } from '@mui/material';
 import { supabase } from '../../../supabase/client';
 
 export default function KnowledgeBasePanel() {
@@ -9,7 +9,7 @@ export default function KnowledgeBasePanel() {
       try {
         const { data, error } = await supabase.from('knowledge_base').select('id, title, content').order('created_at', { ascending: false }).limit(20);
         if (!error && data) { setItems(data); return; }
-      } catch {}
+      } catch (error) { console.warn('Knowledge base error:', error); }
       setItems([
         { id: 'kb1', title: 'How to issue a new ticket', content: 'Go to Bookings Hub and use Quick Booking.' },
         { id: 'kb2', title: 'Refund policy', content: 'Refund within 24 hours of departure are subject to approval.' },

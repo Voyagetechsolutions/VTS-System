@@ -20,7 +20,7 @@ export async function connectBusHub(baseUrl = '') {
       if (typeof window !== 'undefined' && window.companyId) {
         await hub.invoke('JoinCompanyGroup', String(window.companyId));
       }
-    } catch {}
+    } catch (error) { console.warn('SignalR error:', error); }
     return hub;
   } catch (e) {
     console.error('SignalR connection failed', e);
@@ -45,10 +45,10 @@ export async function disconnectBusHub() {
         if (typeof window !== 'undefined' && window.companyId) {
           await hub.invoke('LeaveCompanyGroup', String(window.companyId));
         }
-      } catch {}
+      } catch (error) { console.warn('SignalR error:', error); }
       await hub.stop();
     }
-  } catch {}
+  } catch (error) { console.warn('SignalR error:', error); }
   hub = null;
   conn = null;
 }

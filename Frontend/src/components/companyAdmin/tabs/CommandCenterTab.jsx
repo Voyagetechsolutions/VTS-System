@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Grid, Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, Select, MenuItem, TextField, Typography, Stack } from '@mui/material';
+import { Grid, Button, Typography, Stack, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem } from '@mui/material';
 import DashboardCard, { StatsCard, QuickActionCard } from '../../common/DashboardCard';
 import DataTable from '../../common/DataTable';
 import CommandCenterMap from './CommandCenterMap';
@@ -27,10 +27,9 @@ export default function CommandCenterTab() {
   const [addRouteOpen, setAddRouteOpen] = useState(false);
   const [addRouteForm, setAddRouteForm] = useState({ origin: '', destination: '', departure_time: '', arrival_time: '', arrival_day: 'same_day', route_code: '' });
   const [assignOpen, setAssignOpen] = useState(false);
+  // const [addNewBusOpen, setAddNewBusOpen] = useState(false); // TODO: Implement add bus functionality
   const [drivers, setDrivers] = useState([]);
   const [assignForm, setAssignForm] = useState({ driver_id: '', bus_id: '', route_id: '' });
-  const [addNewBusOpen, setAddNewBusOpen] = useState(false);
-  const [newBusForm, setNewBusForm] = useState({ license_plate: '', capacity: 50, status: 'Active', name: '', type: '' });
 
   const loadDashboard = async () => {
     try {
@@ -53,11 +52,11 @@ export default function CommandCenterTab() {
         refundsPending,
         staffUtilization: staffUtil,
       }));
-    } catch {}
+    } catch (error) { console.error('Failed to load KPIs:', error); }
     try {
       const a = await getCompanyAlertsFeed();
       setAlerts(a.data || []);
-    } catch {}
+    } catch (error) { console.error('Failed to load alerts:', error); }
     try {
       const [{ data: routeList }, { data: busList }, { data: driverList }] = await Promise.all([
         getCompanyRoutes(), getCompanyBuses(), getDrivers()
@@ -65,11 +64,14 @@ export default function CommandCenterTab() {
       setRoutes(routeList || []);
       setBuses(busList || []);
       setDrivers(driverList || []);
-    } catch {}
+    } catch (error) { console.error('Failed to load data:', error); }
   };
 
   useEffect(() => {
-    loadDashboard();
+    const loadData = async () => {
+      await loadDashboard();
+    };
+    loadData();
     const onOpenAddBus = () => setAddBusOpen(true);
     const onOpenAddRoute = () => setAddRouteOpen(true);
     const onOpenAssign = () => setAssignOpen(true);

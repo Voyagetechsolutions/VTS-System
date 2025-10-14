@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Box, Paper, Typography, Grid, Chip } from '@mui/material';
 import { supabase } from '../../../supabase/client';
 
@@ -10,14 +10,19 @@ export default function FleetAvailabilityCalendar() {
   const [buses, setBuses] = useState([]);
   const [busyMap, setBusyMap] = useState({});
 
-  const load = async () => {
-    const cid = window.companyId;
-    const [{ data: busList }, { data: trips }, { data: maint }] = await Promise.all([
-      supabase.from('buses').select('bus_id, license_plate').eq('company_id', cid),
-      supabase.from('trips_with_details').select('bus_id, departure_time, arrival_time').eq('company_id', cid).gte('departure_time', daysAhead(0).toISOString()).lte('departure_time', daysAhead(7).toISOString()),
-      supabase.from('maintenance_logs').select('bus_id, scheduled_at, status').eq('company_id', cid).gte('scheduled_at', daysAhead(0).toISOString()).lte('scheduled_at', daysAhead(7).toISOString()),
+  const load = useCallback(async () => {
+    const { data } = await supabase
+      .from('buses')
+      .select('bus_id, license_plate, status, maintenance_due')
+      .eq('company_id', window.companyId);
+    setBuses(data || []);
+    
+    // Load busy schedule
+    const [{ data: trips }, { data: maint }] = await Promise.all([
+      supabase.from('trips').select('bus_id, departure_time').eq('company_id', window.companyId).gte('departure_time', new Date().toISOString()),
+      supabase.from('maintenance_tasks').select('bus_id, scheduled_at').eq('company_id', window.companyId).gte('scheduled_at', new Date().toISOString())
     ]);
-    setBuses(busList || []);
+    
     const map = {};
     (trips || []).forEach(t => {
       const day = new Date(t.departure_time).toDateString();
@@ -30,9 +35,14 @@ export default function FleetAvailabilityCalendar() {
       map[m.bus_id][day] = 'Maintenance';
     });
     setBusyMap(map);
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [load]);
 
   const days = Array.from({ length: 7 }).map((_, i) => daysAhead(i));
 

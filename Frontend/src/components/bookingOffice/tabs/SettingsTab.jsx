@@ -10,11 +10,17 @@ export default function SettingsTab() {
   const [branchId, setBranchId] = useState('');
 
   useEffect(() => {
-    const u = window.user || {}; const email = u.email || '';
-    setProfile(p => ({ ...p, name: (window.userName || 'Agent'), contact: email }));
-    setEmailForReset(email);
-    getBranches().then(({ data }) => setBranches(data || []));
-    try { const b = localStorage.getItem('branchId'); if (b) setBranchId(b); } catch {}
+    const loadData = async () => {
+      const u = window.user || {}; const email = u.email || '';
+      setTimeout(() => {
+        setProfile(p => ({ ...p, name: (window.userName || 'Agent'), contact: email }));
+        setEmailForReset(email);
+      }, 0);
+      const { data } = await getBranches();
+      setBranches(data || []);
+      try { const b = localStorage.getItem('branchId'); if (b) setBranchId(b); } catch (error) { console.warn('Failed to get branch ID:', error); }
+    };
+    loadData();
   }, []);
 
   const resetPassword = async () => {
@@ -35,7 +41,7 @@ export default function SettingsTab() {
         <TextField label="Contact" value={profile.contact} onChange={e => setProfile(p => ({ ...p, contact: e.target.value }))} sx={{ mb: 2 }} fullWidth />
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mb: 2 }}>
           <TextField label="Branch (label)" value={profile.branch} onChange={e => setProfile(p => ({ ...p, branch: e.target.value }))} fullWidth />
-          <Select value={branchId} onChange={e => { setBranchId(e.target.value); try { localStorage.setItem('branchId', String(e.target.value)); window.userBranchId = Number(e.target.value); } catch {} }} displayEmpty fullWidth>
+          <Select value={branchId} onChange={e => { setBranchId(e.target.value); try { localStorage.setItem('branchId', e.target.value); window.userBranchId = Number(e.target.value); } catch (error) { console.warn('Failed to save branch ID:', error); } }} displayEmpty fullWidth>
             <MenuItem value="">Select Branch (ID)</MenuItem>
             {(branches||[]).map(b => <MenuItem key={b.branch_id} value={b.branch_id}>{b.name} {b.location ? `• ${b.location}` : ''}</MenuItem>)}
           </Select>

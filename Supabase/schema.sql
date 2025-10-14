@@ -99,8 +99,35 @@ CREATE TABLE IF NOT EXISTS buses (
   feature_toilet BOOLEAN DEFAULT FALSE,
   mileage NUMERIC,
   last_service_at TIMESTAMP,
+  status_rank INT,
+  current_driver_id UUID,
+  assigned_route_id UUID,
   created_at TIMESTAMP DEFAULT now()
 );
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'buses' AND column_name = 'status_rank'
+  ) THEN
+    ALTER TABLE buses ADD COLUMN status_rank INT;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'buses' AND column_name = 'current_driver_id'
+  ) THEN
+    ALTER TABLE buses ADD COLUMN current_driver_id UUID;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'buses' AND column_name = 'assigned_route_id'
+  ) THEN
+    ALTER TABLE buses ADD COLUMN assigned_route_id UUID;
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS routes (
   route_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -121,8 +148,43 @@ CREATE TABLE IF NOT EXISTS routes (
   discount_percent NUMERIC,
   pickup_city_id UUID REFERENCES cities(id),
   dropoff_city_id UUID REFERENCES cities(id),
+  start_latitude NUMERIC,
+  start_longitude NUMERIC,
+  end_latitude NUMERIC,
+  end_longitude NUMERIC,
   created_at TIMESTAMP DEFAULT now()
 );
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'routes' AND column_name = 'start_latitude'
+  ) THEN
+    ALTER TABLE routes ADD COLUMN start_latitude NUMERIC;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'routes' AND column_name = 'start_longitude'
+  ) THEN
+    ALTER TABLE routes ADD COLUMN start_longitude NUMERIC;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'routes' AND column_name = 'end_latitude'
+  ) THEN
+    ALTER TABLE routes ADD COLUMN end_latitude NUMERIC;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'routes' AND column_name = 'end_longitude'
+  ) THEN
+    ALTER TABLE routes ADD COLUMN end_longitude NUMERIC;
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS route_stops (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -150,6 +212,33 @@ CREATE TABLE IF NOT EXISTS bus_routes (
   created_at TIMESTAMP DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS bus_locations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  bus_id UUID REFERENCES buses(bus_id) ON DELETE CASCADE,
+  company_id UUID REFERENCES companies(company_id) ON DELETE CASCADE,
+  latitude NUMERIC(10,7),
+  longitude NUMERIC(10,7),
+  speed_kph NUMERIC,
+  heading NUMERIC,
+  location_label TEXT,
+  recorded_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_bus_locations_bus_time ON bus_locations(bus_id, recorded_at DESC);
+
+CREATE OR REPLACE VIEW bus_latest_locations AS
+SELECT DISTINCT ON (bl.bus_id)
+  bl.bus_id,
+  bl.company_id,
+  bl.latitude,
+  bl.longitude,
+  bl.speed_kph,
+  bl.heading,
+  bl.location_label,
+  bl.recorded_at
+FROM bus_locations bl
+ORDER BY bl.bus_id, bl.recorded_at DESC;
+
 CREATE TABLE IF NOT EXISTS route_companies (
   route_id UUID REFERENCES routes(route_id) ON DELETE CASCADE,
   company_id UUID REFERENCES companies(company_id) ON DELETE CASCADE,
@@ -168,6 +257,51 @@ CREATE TABLE IF NOT EXISTS drivers (
   created_at TIMESTAMP DEFAULT now(),
   updated_at TIMESTAMP
 );
+
+CREATE OR REPLACE FUNCTION admin_live_map_fleet(p_company_id UUID)
+RETURNS JSONB
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+WITH latest AS (
+  SELECT bl.bus_id, bl.latitude, bl.longitude, bl.location_label, bl.recorded_at, bl.speed_kph, bl.heading
+  FROM bus_latest_locations bl
+  WHERE bl.company_id = p_company_id
+),
+fleet AS (
+  SELECT
+    b.license_plate,
+    jsonb_build_object(
+      'bus_id', b.bus_id,
+      'license_plate', b.license_plate,
+      'status', b.status,
+      'status_rank', b.status_rank,
+      'status_text', CASE b.status_rank WHEN 1 THEN 'FIT' WHEN 2 THEN 'OK' WHEN 3 THEN 'UNWELL' ELSE NULL END,
+      'route_id', b.assigned_route_id,
+      'route_name', CASE WHEN r.origin IS NOT NULL OR r.destination IS NOT NULL THEN concat_ws(' \u2192 ', r.origin, r.destination) ELSE NULL END,
+      'route_origin', r.origin,
+      'route_destination', r.destination,
+      'driver_id', COALESCE(d_direct.driver_id, d_assigned.driver_id),
+      'driver_name', COALESCE(d_direct.name, d_assigned.name),
+      'latitude', l.latitude,
+      'longitude', l.longitude,
+      'location_label', l.location_label,
+      'last_update', l.recorded_at,
+      'speed_kph', l.speed_kph,
+      'heading', l.heading
+    ) AS bus
+  FROM buses b
+  LEFT JOIN latest l ON l.bus_id = b.bus_id
+  LEFT JOIN drivers d_direct ON d_direct.driver_id = b.current_driver_id
+  LEFT JOIN drivers d_assigned ON d_assigned.assigned_bus_id = b.bus_id AND d_assigned.company_id = b.company_id
+  WHERE b.company_id = p_company_id
+)
+SELECT jsonb_build_object(
+  'buses', COALESCE(jsonb_agg(fleet.bus ORDER BY fleet.license_plate), '[]'::jsonb)
+)
+FROM fleet;
+$$;
 
 CREATE TABLE IF NOT EXISTS trips (
   trip_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -312,10 +446,37 @@ CREATE TABLE IF NOT EXISTS incidents (
   reported_by_user_id UUID REFERENCES users(user_id),
   assigned_to_user_id UUID REFERENCES users(user_id),
   resolution TEXT,
+  latitude NUMERIC(10,7),
+  longitude NUMERIC(10,7),
+  location_label TEXT,
   company_id UUID REFERENCES companies(company_id),
   trip_id UUID REFERENCES trips(trip_id),
   bus_id UUID REFERENCES buses(bus_id)
 );
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'incidents' AND column_name = 'latitude'
+  ) THEN
+    ALTER TABLE incidents ADD COLUMN latitude NUMERIC(10,7);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'incidents' AND column_name = 'longitude'
+  ) THEN
+    ALTER TABLE incidents ADD COLUMN longitude NUMERIC(10,7);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'incidents' AND column_name = 'location_label'
+  ) THEN
+    ALTER TABLE incidents ADD COLUMN location_label TEXT;
+  END IF;
+END $$;
 
 -- =========================
 -- Billing & Subscriptions

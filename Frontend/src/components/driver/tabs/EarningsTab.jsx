@@ -34,7 +34,12 @@ export default function EarningsTab() {
     setSummary({ estimate: estRes.data?.estimate || 0, completedTrips: estRes.data?.completedTrips || 0 });
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
 
   const exportCSV = () => {
     const blob = new Blob([toCSV(rows)], { type: 'text/csv;charset=utf-8;' });

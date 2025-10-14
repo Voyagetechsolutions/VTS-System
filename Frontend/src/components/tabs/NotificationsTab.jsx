@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Paper, Typography, Stack, Chip, Divider, List, ListItem, ListItemText, IconButton } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { getActivityLog, getIncidents, getNotifications, getMessages } from '../../supabase/api';
@@ -9,34 +9,65 @@ export default function NotificationsTab() {
   const [incidents, setIncidents] = useState([]);
   const [messages, setMessages] = useState([]);
 
-  const load = async () => {
-    const [a, i, n, m] = await Promise.all([
+  const fetchSnapshot = useCallback(async () => {
+    const [activity, incidentRes, notificationRes, messageRes] = await Promise.all([
       getActivityLog({ types: ['trip_status', 'incident_alert', 'speed_alert', 'maintenance_check'] }),
       getIncidents(),
       getNotifications?.() || { data: [] },
       getMessages(),
     ]);
-    setAlerts(a.data || []);
-    setIncidents(i.data || []);
-    setMessages(m.data || []);
-  };
-
-  useEffect(() => { load(); }, []);
-  useEffect(() => {
-    const subs = [
-      subscribeToRoutes(load),
-      subscribeToBuses(load),
-      subscribeToIncidents(load),
-      subscribeToMessages(load)
-    ];
-    return () => { subs.forEach(s => { try { s.unsubscribe?.(); } catch {} }); };
+    return {
+      activity: activity.data || [],
+      incidents: incidentRes.data || [],
+      messages: messageRes.data || [],
+    };
   }, []);
+
+  const applySnapshot = useCallback(async () => {
+    const snapshot = await fetchSnapshot();
+    setAlerts(snapshot.activity);
+    setIncidents(snapshot.incidents);
+    setMessages(snapshot.messages);
+  }, [fetchSnapshot]);
+
+  useEffect(() => {
+    let active = true;
+    const syncData = async () => {
+      const snapshot = await fetchSnapshot();
+      if (!active) return;
+      setAlerts(snapshot.activity);
+      setIncidents(snapshot.incidents);
+      setMessages(snapshot.messages);
+    };
+    syncData();
+    return () => {
+      active = false;
+    };
+  }, [fetchSnapshot]);
+
+  useEffect(() => {
+    const subscriptions = [
+      subscribeToRoutes(applySnapshot),
+      subscribeToBuses(applySnapshot),
+      subscribeToIncidents(applySnapshot),
+      subscribeToMessages(applySnapshot)
+    ];
+    return () => {
+      subscriptions.forEach((sub) => {
+        try {
+          sub.unsubscribe?.();
+        } catch (err) {
+          console.error('Failed to unsubscribe notification listener', err);
+        }
+      });
+    };
+  }, [applySnapshot]);
 
   return (
     <Box>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Typography variant="h6">Notifications & Alerts</Typography>
-        <IconButton onClick={load}><RefreshIcon /></IconButton>
+        <IconButton onClick={() => { void applySnapshot(); }}><RefreshIcon /></IconButton>
       </Stack>
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
         <Paper sx={{ p: 2, flex: 1 }}>

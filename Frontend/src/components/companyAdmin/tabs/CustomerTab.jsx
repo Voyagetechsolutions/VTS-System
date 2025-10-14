@@ -21,7 +21,12 @@ export default function CustomerTab() {
     const { data } = await supabase.from('customers').select('*').eq('company_id', window.companyId);
     setCustomers(data || []);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
   useEffect(() => { (async () => { try { const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole') || 'admin'; const { data } = await getCompanySettings(); setCanEdit(!!(data?.rbac?.[role]?.edit)); } catch { setCanEdit(true); } })(); }, []);
 
   const filtered = customers.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));

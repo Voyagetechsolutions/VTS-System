@@ -39,7 +39,7 @@ export default function DriverDashboard() {
   const [tab, setTab] = React.useState(0);
   useEffect(() => {
     const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole');
-    if (role && role !== 'driver') {
+    if (!role || role !== 'driver') {
       window.location.replace('/');
     }
   }, []);

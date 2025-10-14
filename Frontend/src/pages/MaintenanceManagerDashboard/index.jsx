@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box } from '@mui/material';
 import SidebarLayout from '../../components/layout/SidebarLayout';
 import CommandCenterTab from '../../components/maintenanceManager/tabs/CommandCenterTab';
@@ -33,10 +33,10 @@ const tabComponents = [
 ];
 
 export default function MaintenanceManagerDashboard() {
-  const [tab, setTab] = React.useState(0);
+  const [tab, setTab] = useState(0);
   useEffect(() => {
     const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole');
-    if (role && role !== 'maintenance_manager') {
+    if (!role || role !== 'maintenance_manager') {
       window.location.replace('/');
     }
   }, []);

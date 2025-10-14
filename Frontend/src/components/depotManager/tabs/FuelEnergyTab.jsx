@@ -29,7 +29,12 @@ export default function FuelEnergyTab() {
     setFuel(data || []);
     setWeekly(groupWeekly(data||[]));
   };
-  useEffect(() => { load(); }, [companyId]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [companyId]);
   return (
     <Grid container spacing={2}>
       <Grid item xs={12} md={7}><DashboardCard title="Fuel Logs" variant="outlined" headerAction={<ModernButton icon="add" onClick={()=>{ setForm({ bus_id: '', liters: 0, price: 0, pump_id: '', notes: '' }); setOpen(true); }}>Add</ModernButton>}><DataTable data={fuel} columns={[{ field: 'filled_at', headerName: 'Date', type: 'date' }, { field: 'bus_id', headerName: 'Bus' }, { field: 'liters', headerName: 'Liters' }, { field: 'cost_per_liter', headerName: 'Cost/L' }, { field: 'pump_id', headerName: 'Pump' }, { field: 'notes', headerName: 'Notes' }]} searchable pagination /></DashboardCard></Grid>

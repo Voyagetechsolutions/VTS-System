@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { 
   Grid, Paper, Typography, Button, Box, Card, CardContent, 
   List, ListItem, ListItemText, ListItemIcon, Chip, Alert, 
-  Stack, Divider, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Select, MenuItem, FormControl, InputLabel
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  TextField
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -12,7 +12,7 @@ import PaidIcon from '@mui/icons-material/Paid';
 import RouteIcon from '@mui/icons-material/Route';
 import BuildIcon from '@mui/icons-material/Build';
 import PeopleIcon from '@mui/icons-material/People';
-import { formatCurrency, formatNumber } from '../../../utils/formatters';
+import { formatCurrency } from '../../../utils/formatters';
 import { 
   getPendingApprovals, approveRequest, rejectRequest, 
   getLargeRefunds, getRouteRequests, getMaintenanceRequests, 
@@ -31,20 +31,6 @@ export default function ApprovalsTab() {
   const [approvalDialog, setApprovalDialog] = useState(false);
   const [approvalNotes, setApprovalNotes] = useState('');
   const [canApprove, setCanApprove] = useState(true);
-
-  useEffect(() => {
-    loadApprovalData();
-    (async () => {
-      try {
-        const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole') || 'admin';
-        const { data } = await getCompanySettings();
-        const approveFlag = !!(data?.rbac?.[role]?.approve);
-        setCanApprove(approveFlag);
-      } catch { setCanApprove(true); }
-    })();
-    const interval = setInterval(loadApprovalData, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
-  }, []);
 
   const loadApprovalData = async () => {
     try {
@@ -65,6 +51,23 @@ export default function ApprovalsTab() {
       console.error('Failed to load approval data:', error);
     }
   };
+
+  useEffect(() => {
+    const loadData = async () => {
+      await loadApprovalData();
+    };
+    loadData();
+    (async () => {
+      try {
+        const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole') || 'admin';
+        const { data } = await getCompanySettings();
+        const approveFlag = !!(data?.rbac?.[role]?.approve);
+        setCanApprove(approveFlag);
+      } catch { setCanApprove(true); }
+    })();
+    const interval = setInterval(loadApprovalData, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   const handleApproval = async (approvalId, action, notes = '') => {
     try {

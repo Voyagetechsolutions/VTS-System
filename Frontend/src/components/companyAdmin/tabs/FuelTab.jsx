@@ -6,6 +6,51 @@ import { supabase } from '../../../supabase/client';
 import { Box } from '@mui/material';
 import { ModernButton, ModernSelect, ModernTextField } from '../../common/FormComponents';
 
+// Chart components defined outside to avoid re-creation on each render
+const BarChart = ({ data, width = 480, height = 180, color = '#1976d2' }) => {
+  const max = Math.max(1, ...data.map(([, v]) => v));
+  const barWidth = Math.max(8, Math.floor((width - 40) / Math.max(1, data.length)));
+  return (
+    <svg width={width} height={height} style={{ background: 'transparent' }}>
+      {data.map(([label, value], i) => {
+        const h = Math.round((value / max) * (height - 40));
+        const x = 30 + i * barWidth;
+        const y = height - 20 - h;
+        return (
+          <g key={label}>
+            <rect x={x} y={y} width={barWidth - 4} height={h} fill={color} rx={3} />
+            <text x={x + (barWidth - 4) / 2} y={height - 6} fontSize="9" textAnchor="middle" fill="#666">{String(label).slice(0,6)}</text>
+          </g>
+        );
+      })}
+      <text x={4} y={12} fontSize="11" fill="#444">Top Fuel Cost by Bus</text>
+    </svg>
+  );
+};
+
+const LineChart = ({ data, width = 480, height = 180, color = '#2e7d32' }) => {
+  if (!data.length) return <svg width={width} height={height} />;
+  const values = data.map(([, v]) => v);
+  const max = Math.max(1, ...values);
+  const stepX = (width - 40) / Math.max(1, data.length - 1);
+  const points = data.map(([, v], i) => {
+    const x = 20 + i * stepX;
+    const y = height - 20 - Math.round((v / max) * (height - 40));
+    return `${x},${y}`;
+  }).join(' ');
+  return (
+    <svg width={width} height={height} style={{ background: 'transparent' }}>
+      <polyline points={points} fill="none" stroke={color} strokeWidth="2" />
+      {data.map(([label, v], i) => {
+        const x = 20 + i * stepX;
+        const y = height - 20 - Math.round((v / max) * (height - 40));
+        return <circle key={label} cx={x} cy={y} r={2} fill={color} />;
+      })}
+      <text x={4} y={12} fontSize="11" fill="#444">Fuel Consumption (last 14 days)</text>
+    </svg>
+  );
+};
+
 export default function FuelTab() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,7 +64,12 @@ export default function FuelTab() {
     setBuses(b.data || []);
     setLoading(false);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
 
   const save = async () => {
     await upsertFuelLog(form);
@@ -48,50 +98,6 @@ export default function FuelTab() {
     const arr = Array.from(byDate.entries()).sort((a,b) => new Date(a[0]) - new Date(b[0]));
     return arr.slice(-14); // last 14 days
   }, [rows]);
-
-  const BarChart = ({ data, width = 480, height = 180, color = '#1976d2' }) => {
-    const max = Math.max(1, ...data.map(([, v]) => v));
-    const barWidth = Math.max(8, Math.floor((width - 40) / Math.max(1, data.length)));
-    return (
-      <svg width={width} height={height} style={{ background: 'transparent' }}>
-        {data.map(([label, value], i) => {
-          const h = Math.round((value / max) * (height - 40));
-          const x = 30 + i * barWidth;
-          const y = height - 20 - h;
-          return (
-            <g key={label}>
-              <rect x={x} y={y} width={barWidth - 4} height={h} fill={color} rx={3} />
-              <text x={x + (barWidth - 4) / 2} y={height - 6} fontSize="9" textAnchor="middle" fill="#666">{String(label).slice(0,6)}</text>
-            </g>
-          );
-        })}
-        <text x={4} y={12} fontSize="11" fill="#444">Top Fuel Cost by Bus</text>
-      </svg>
-    );
-  };
-
-  const LineChart = ({ data, width = 480, height = 180, color = '#2e7d32' }) => {
-    if (!data.length) return <svg width={width} height={height} />;
-    const values = data.map(([, v]) => v);
-    const max = Math.max(1, ...values);
-    const stepX = (width - 40) / Math.max(1, data.length - 1);
-    const points = data.map(([, v], i) => {
-      const x = 20 + i * stepX;
-      const y = height - 20 - Math.round((v / max) * (height - 40));
-      return `${x},${y}`;
-    }).join(' ');
-    return (
-      <svg width={width} height={height} style={{ background: 'transparent' }}>
-        <polyline points={points} fill="none" stroke={color} strokeWidth="2" />
-        {data.map(([label, v], i) => {
-          const x = 20 + i * stepX;
-          const y = height - 20 - Math.round((v / max) * (height - 40));
-          return <circle key={label} cx={x} cy={y} r={2} fill={color} />;
-        })}
-        <text x={4} y={12} fontSize="11" fill="#444">Fuel Consumption (last 14 days)</text>
-      </svg>
-    );
-  };
 
   return (
     <DashboardCard title="Fuel Tracking" variant="outlined" headerAction={

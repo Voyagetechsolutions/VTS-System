@@ -45,7 +45,7 @@ export default function BookingOfficeDashboard() {
   const [tab, setTab] = React.useState(0);
   useEffect(() => {
     const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole');
-    if (role && role !== 'booking_officer') {
+    if (!role || role !== 'booking_officer') {
       window.location.replace('/');
     }
   }, []);

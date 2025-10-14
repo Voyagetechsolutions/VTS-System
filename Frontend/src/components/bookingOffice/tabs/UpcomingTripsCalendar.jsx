@@ -81,7 +81,7 @@ export default function UpcomingTripsCalendar({ companyId, branchId, onBook }) {
               </div>
               <Box sx={{ display: 'flex', gap: .5 }}>
                 <Chip size="small" label="Seats" onClick={() => { setSelectedTrip(t); loadSeats(t); }} />
-                <Chip size="small" color="primary" label="Book" onClick={() => { onBook && onBook({ trip }); }} />
+                <Chip size="small" color="primary" label="Book" onClick={() => { onBook && onBook({ trip: t }); }} />
               </Box>
             </Box>
             {selectedTrip?.trip_id === t.trip_id && (

@@ -51,7 +51,7 @@ export default function HRDashboard() {
   const [tab, setTab] = React.useState(0);
   useEffect(() => {
     const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole');
-    if (role && role !== 'hr_manager') {
+    if (!role || role !== 'hr_manager') {
       window.location.replace('/');
     }
   }, []);

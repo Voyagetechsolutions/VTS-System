@@ -49,10 +49,6 @@ export default function DevOverviewTab() {
     deliveryMethod: 'dashboard'
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
   const loadData = async () => {
     try { 
       const m = await getPlatformMetrics(); 
@@ -73,6 +69,13 @@ export default function DevOverviewTab() {
       console.error('Error loading companies:', error);
     }
   };
+
+  useEffect(() => {
+    const load = async () => {
+      await loadData();
+    };
+    load();
+  }, []);
 
   const handleCreateCompany = async () => {
     try {

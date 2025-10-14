@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+
 import { 
   Box, 
   Drawer, 
@@ -19,7 +20,6 @@ import {
   Select,
   FormControl,
   Collapse,
-  Paper,
   Chip,
   Tooltip,
   useTheme,
@@ -40,6 +40,8 @@ import {
 } from '@mui/icons-material';
 import { supabase } from '../../supabase/client';
 import { getBranches, getCompanyAlertsFeed } from '../../supabase/api';
+import { performLogout } from '../../utils/logout';
+
 import { Icon, roleNavigation } from '../common/IconMap';
 import theme from '../../styles/theme';
 import '../../styles/globalStyles.css';
@@ -64,23 +66,6 @@ export default function SidebarLayout({ children, title, navItems }) {
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
   const isTablet = useMediaQuery(muiTheme.breakpoints.down('lg'));
 
-  useEffect(() => {
-    loadBranches();
-    // Auto-collapse sidebar on tablets
-    if (isTablet && !isMobile) {
-      setSidebarCollapsed(true);
-      // Load notifications count
-(async () => {
-  try {
-    const { data } = await getCompanyAlertsFeed();
-    setNotificationsCount((data || []).length);
-  } catch {
-    setNotificationsCount(0);
-  }
-})();
-    }
-  }, [isTablet, isMobile]);
-
   const loadBranches = async () => {
     try {
       const { data } = await getBranches();
@@ -94,6 +79,33 @@ export default function SidebarLayout({ children, title, navItems }) {
       console.error('Failed to load branches:', error);
     }
   };
+
+  useEffect(() => {
+    const load = async () => {
+      await loadBranches();
+    };
+    load();
+  }, []);
+
+  useEffect(() => {
+    // Auto-collapse sidebar on tablets
+    if (isTablet && !isMobile) {
+      setTimeout(() => setSidebarCollapsed(true), 0);
+    }
+  }, [isTablet, isMobile]);
+
+  useEffect(() => {
+    // Load notifications count
+    (async () => {
+      try {
+        const { data } = await getCompanyAlertsFeed();
+        setNotificationsCount((data || []).length);
+      } catch (error) {
+        console.warn('Failed to load notifications:', error);
+        setNotificationsCount(0);
+      }
+    })();
+  }, []);
 
   const handleBranchChange = async (branchId) => {
     setSelectedBranch(branchId);
@@ -123,12 +135,6 @@ export default function SidebarLayout({ children, title, navItems }) {
 
   const handleProfileMenuClose = () => {
     setAnchorEl(null);
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.clear();
-    window.location.replace('/');
   };
 
   const toggleGroup = (groupId) => {
@@ -575,7 +581,7 @@ export default function SidebarLayout({ children, title, navItems }) {
         </MenuItem>
         <Divider />
         <MenuItem 
-          onClick={handleLogout}
+          onClick={() => performLogout()}
           sx={{
             color: theme.colors.error,
             '&:hover': {

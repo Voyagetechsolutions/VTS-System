@@ -8,20 +8,28 @@ export default function PaymentsTab() {
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [form, setForm] = useState({ booking_id: '', amount: '', method: 'cash' });
 
-  const load = async () => {
-    const { data } = await supabase
-      .from('payments')
-      .select('transaction_id, booking_id, amount, payment_method, paid_at, status')
-      .order('paid_at', { ascending: false });
-    setPayments(data || []);
-  };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const loadData = async () => {
+      const { data } = await supabase
+        .from('payments')
+        .select('payment_id, booking_id, amount, payment_method, status, created_at')
+        .eq('company_id', window.companyId)
+        .order('created_at', { ascending: false });
+      setPayments(data || []);
+    };
+    loadData();
+  }, []);
 
   const markPaid = async () => {
     if (!form.booking_id || !form.amount) return;
     await supabase.rpc('record_payment', { p_booking_id: form.booking_id, p_method: form.method, p_amount: Number(form.amount) });
     setForm({ booking_id: '', amount: '', method: 'cash' });
-    load();
+    const { data } = await supabase
+      .from('payments')
+      .select('payment_id, booking_id, amount, payment_method, status, created_at')
+      .eq('company_id', window.companyId)
+      .order('created_at', { ascending: false });
+    setPayments(data || []);
   };
 
   return (

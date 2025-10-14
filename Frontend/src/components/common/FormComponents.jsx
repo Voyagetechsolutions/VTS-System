@@ -262,7 +262,6 @@ export const ModernButton = ({
 export const IconButtonWithTooltip = ({ 
   icon, 
   tooltip, 
-  color = 'default',
   size = 'medium',
   onClick,
   ...props 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table, TableHead, TableRow, TableCell, TableBody, TablePagination, TextField } from '@mui/material';
 import { supabase } from '../../../supabase/client';
 

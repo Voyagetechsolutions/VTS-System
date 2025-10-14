@@ -6,6 +6,30 @@ import { getCompanyBookings, createBooking, updateBooking, deleteBooking, getCom
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 
+// LineChart component defined outside to avoid re-creation on each render
+const LineChart = ({ data, width = 520, height = 200, color = '#1976d2' }) => {
+  if (!data.length) return <svg width={width} height={height} />;
+  const values = data.map(([, v]) => v);
+  const max = Math.max(1, ...values);
+  const stepX = (width - 40) / Math.max(1, data.length - 1);
+  const points = data.map(([, v], i) => {
+    const x = 20 + i * stepX;
+    const y = height - 20 - Math.round((v / max) * (height - 40));
+    return `${x},${y}`;
+  }).join(' ');
+  return (
+    <svg width={width} height={height} style={{ background: 'transparent' }}>
+      <polyline points={points} fill="none" stroke={color} strokeWidth="2" />
+      {data.map(([label, v], i) => {
+        const x = 20 + i * stepX;
+        const y = height - 20 - Math.round((v / max) * (height - 40));
+        return <circle key={label} cx={x} cy={y} r={2} fill={color} />;
+      })}
+      <text x={4} y={12} fontSize="11" fill="#444">Daily Ticket Sales</text>
+    </svg>
+  );
+};
+
 export default function BookingsTab() {
   const [bookings, setBookings] = useState([]);
   const [branchChart, setBranchChart] = useState([]);
@@ -69,29 +93,6 @@ export default function BookingsTab() {
     return byHourClient;
   }, [departHourChart, byHourClient]);
 
-  const LineChart = ({ data, width = 520, height = 200, color = '#1976d2' }) => {
-    if (!data.length) return <svg width={width} height={height} />;
-    const values = data.map(([, v]) => v);
-    const max = Math.max(1, ...values);
-    const stepX = (width - 40) / Math.max(1, data.length - 1);
-    const points = data.map(([, v], i) => {
-      const x = 20 + i * stepX;
-      const y = height - 20 - Math.round((v / max) * (height - 40));
-      return `${x},${y}`;
-    }).join(' ');
-    return (
-      <svg width={width} height={height} style={{ background: 'transparent' }}>
-        <polyline points={points} fill="none" stroke={color} strokeWidth="2" />
-        {data.map(([label, v], i) => {
-          const x = 20 + i * stepX;
-          const y = height - 20 - Math.round((v / max) * (height - 40));
-          return <circle key={label} cx={x} cy={y} r={2} fill={color} />;
-        })}
-        <text x={4} y={12} fontSize="11" fill="#444">Daily Ticket Sales</text>
-      </svg>
-    );
-  };
-
   useEffect(() => {
     (async () => {
       getCompanyBookings().then(({ data }) => setBookings(data || []));
@@ -106,19 +107,19 @@ export default function BookingsTab() {
         const cid = window.companyId;
         const { data: byBranch } = await supabase.rpc('bookings_by_branch', { p_company_id: cid });
         setBranchChart((byBranch || []).map(r => ({ label: r.branch_name || String(r.branch_id||'Unknown'), value: Number(r.count||0) })));
-      } catch {}
+      } catch (error) { console.warn('Operation error:', error); }
       try {
         const cid = window.companyId;
         const { data: byChannel } = await supabase.rpc('bookings_by_channel', { p_company_id: cid });
         setChannelChart((byChannel || []).map(r => ({ label: String(r.channel||'Unknown'), value: Number(r.count||0) })));
-      } catch {}
+      } catch (error) { console.warn('Operation error:', error); }
       try {
         const cid = window.companyId;
         const { data: byRouteRpc } = await supabase.rpc('bookings_by_route', { p_company_id: cid });
         if (Array.isArray(byRouteRpc)) {
           setRouteChart(byRouteRpc.map(r => ({ label: r.route_label || `${r.origin||''} → ${r.destination||''}` || String(r.route_id||'Unknown'), value: Number(r.count||0) })));
         }
-      } catch {}
+      } catch (error) { console.warn('Operation error:', error); }
       try {
         const cid = window.companyId;
         const { data: byHourRpc } = await supabase.rpc('bookings_by_hour', { p_company_id: cid });
@@ -130,7 +131,7 @@ export default function BookingsTab() {
           });
           setHourChart(arr);
         }
-      } catch {}
+      } catch (error) { console.warn('Operation error:', error); }
       try {
         const cid = window.companyId;
         const { data: byDepartRpc } = await supabase.rpc('departures_by_hour', { p_company_id: cid });
@@ -142,7 +143,7 @@ export default function BookingsTab() {
           });
           setDepartHourChart(arr);
         }
-      } catch {}
+      } catch (error) { console.warn('Operation error:', error); }
     })();
   }, []);
 
@@ -294,7 +295,7 @@ export default function BookingsTab() {
                 {canEdit && <Button size="small" variant="outlined" onClick={() => openActions(b)}>Actions</Button>}
                 {canEdit && <IconButton onClick={() => openEdit(b)}><EditIcon /></IconButton>}
                 {canEdit && (
-                  <IconButton onClick={async () => { await deleteBooking(b.booking_id); try { await supabase.from('activity_log').insert([{ company_id: window.companyId, type: 'booking_delete', message: JSON.stringify({ booking_id: b.booking_id, by: window.userId }) }]); } catch {} getCompanyBookings().then(({ data }) => setBookings(data || [])); }}><DeleteIcon /></IconButton>
+                  <IconButton onClick={async () => { await deleteBooking(b.booking_id); try { await supabase.from('activity_log').insert([{ company_id: window.companyId, type: 'booking_delete', message: JSON.stringify({ booking_id: b.booking_id, by: window.userId }) }]); } catch (error) { console.error('Failed to log activity:', error); } getCompanyBookings().then(({ data }) => setBookings(data || [])); }}><DeleteIcon /></IconButton>
                 )}
               </TableCell>
             </TableRow>

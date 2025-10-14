@@ -1,36 +1,38 @@
-import React, { useEffect, useState } from 'react';
-import { Grid, Box, Typography, Button } from '@mui/material';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Grid } from '@mui/material';
 import DashboardCard, { StatsCard, QuickActionCard } from '../../common/DashboardCard';
-import DataTable from '../../common/DataTable';
-import { startBackgroundSync, flushQueue } from '../../../utils/offlineQueue';
+import { startBackgroundSync } from '../../../utils/offlineQueue';
 import { createBooking } from '../../../supabase/api';
 import BookingWizard from './BookingWizard';
 import UpcomingTripsCalendar from './UpcomingTripsCalendar';
 import { supabase } from '../../../supabase/client';
 
 export default function CommandCenterTab() {
-  const [kpis, setKpis] = useState({ tickets: 0, revenue: 0, refunds: 0, boarded: 0 });
+  const [kpis, setKpis] = useState({ totalBookings: 0, todayBookings: 0, revenue: 0, avgOccupancy: 0 });
   const [upcoming, setUpcoming] = useState([]);
-  const [alerts, setAlerts] = useState([]);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardTripPrefill, setWizardTripPrefill] = useState({ id: null, seats: [] });
   const branchId = window.userBranchId || localStorage.getItem('branchId') || null;
   const companyId = window.companyId || localStorage.getItem('companyId') || null;
 
-  const loadKPIs = async () => {
+  const loadKPIs = useCallback(async () => {
     const start = new Date(); start.setHours(0,0,0,0);
     const end = new Date(); end.setHours(23,59,59,999);
-    const [b, p, r, c] = await Promise.all([
+    const [b, p, , , t] = await Promise.all([
+      supabase.from('bookings').select('booking_id').eq('company_id', companyId).eq('branch_id', branchId),
       supabase.from('bookings').select('booking_id').eq('company_id', companyId).eq('branch_id', branchId).gte('booking_date', start.toISOString()).lte('booking_date', end.toISOString()),
       supabase.from('payments').select('amount').eq('company_id', companyId).eq('branch_id', branchId).gte('created_at', start.toISOString()).lte('created_at', end.toISOString()),
       supabase.from('refunds').select('id').eq('company_id', companyId).eq('branch_id', branchId).gte('created_at', start.toISOString()).lte('created_at', end.toISOString()),
       supabase.from('bookings').select('booking_id').eq('company_id', companyId).eq('branch_id', branchId).eq('status','CheckedIn').gte('updated_at', start.toISOString()).lte('updated_at', end.toISOString()),
     ]);
     const revenue = (p.data || []).reduce((s, x) => s + Number(x.amount || 0), 0);
-    setKpis({ tickets: (b.data||[]).length, revenue, refunds: (r.data||[]).length, boarded: (c.data||[]).length });
-  };
+    const totalBookings = (b.data || []).length;
+    const todayBookings = (t.data || []).length;
+    const avgOcc = (b.data || []).reduce((s, x) => s + Number(x.passenger_count || 0), 0) / totalBookings;
+    setKpis({ totalBookings, todayBookings, revenue, avgOccupancy: Math.round(avgOcc) });
+  }, [branchId, companyId]);
 
-  const loadUpcomingTrips = async () => {
+  const loadUpcomingTrips = useCallback(async () => {
     const now = new Date().toISOString();
     const { data } = await supabase
       .from('trips_with_details')
@@ -41,20 +43,24 @@ export default function CommandCenterTab() {
       .order('departure_time', { ascending: true })
       .limit(10);
     setUpcoming(data || []);
-  };
+  }, [branchId, companyId]);
 
-  const loadAlerts = () => {
+  const loadAlerts = useCallback(() => {
     const alerts = [];
     (upcoming||[]).forEach(t => {
       const occ = t.capacity ? Math.round((t.passenger_count||0) / t.capacity * 100) : 0;
       if (occ > 100) alerts.push({ created_at: new Date().toISOString(), type: 'overbooked', message: `Trip ${t.trip_id} overbooked (${occ}%)` });
       if ((t.status||'').toLowerCase() === 'delayed') alerts.push({ created_at: new Date().toISOString(), type: 'delay', message: `Trip ${t.trip_id} is delayed` });
     });
-    setAlerts(alerts);
-  };
+  }, [upcoming]);
 
-  useEffect(() => { loadKPIs(); loadUpcomingTrips(); }, [branchId, companyId]);
-  useEffect(() => { loadAlerts(); }, [upcoming]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await Promise.all([loadKPIs(), loadUpcomingTrips()]);
+    };
+    loadData();
+  }, [loadKPIs, loadUpcomingTrips]);
+  useEffect(() => { loadAlerts(); }, [loadAlerts]);
   useEffect(() => {
     // background sync for offline queued bookings
     startBackgroundSync({
@@ -70,7 +76,7 @@ export default function CommandCenterTab() {
         }
       }
     }, 30000);
-    return () => { try { startBackgroundSync({}, 0); } catch {} };
+    return () => { try { startBackgroundSync({}, 0); } catch (error) { console.warn('Background sync error:', error); } };
   }, []);
 
   const actions = [

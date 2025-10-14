@@ -35,10 +35,15 @@ export default function TripInfoTab({ scope = 'driver' }) {
       if (dateEnd) q = q.lte('date', dateEnd);
       const { data, error } = await q;
       if (!error) setTrips(data || []);
-    } catch {}
+    } catch (error) { console.warn('Operation error:', error); }
   };
 
-  useEffect(() => { load(); }, [status, routeId, dateStart, dateEnd]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [status, routeId, dateStart, dateEnd]);
   useEffect(() => { (async () => { try { const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole') || 'admin'; const { data } = await getCompanySettings(); setCanEdit(!!(data?.rbac?.[role]?.edit)); } catch { setCanEdit(true); } })(); }, []);
 
   const openDetails = (t) => { setSelectedTrip(t); setDetailsOpen(true); };
@@ -61,7 +66,7 @@ export default function TripInfoTab({ scope = 'driver' }) {
       setReschedOpen(false);
       setSelectedTrip(null);
       load();
-    } catch {}
+    } catch (error) { console.warn('Operation error:', error); }
   };
 
   return (

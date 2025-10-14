@@ -19,6 +19,15 @@ export default function FleetTrackingPage() {
   const playbackDataRef = useRef([]);
   const LRef = useRef(null);
 
+  // Authentication check
+  useEffect(() => {
+    const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole');
+    const allowedRoles = ['driver', 'ops_manager', 'operations_manager', 'depot_manager', 'admin', 'maintenance_manager'];
+    if (!role || !allowedRoles.includes(role)) {
+      window.location.replace('/');
+    }
+  }, []);
+
   // Load Leaflet and initialize map
   useEffect(() => {
     (async () => {

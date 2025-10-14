@@ -86,7 +86,7 @@ function safeGet(obj, path, defaultValue) {
 }
 
 function App() {
-  const [mode, setMode] = useState('light');
+  const [mode, setMode] = useState(() => safeGetStorage('ui-mode', 'light'));
   const [isReady, setIsReady] = useState(false);
 
   // iOS-safe initialization
@@ -210,11 +210,6 @@ function App() {
     }
   }, []);
 
-  // iOS-safe theme loading
-  useEffect(() => {
-    const saved = safeGetStorage('ui-mode', 'light');
-    setMode(saved);
-  }, []);
 
   const muiTheme = useMemo(function() {
     try {

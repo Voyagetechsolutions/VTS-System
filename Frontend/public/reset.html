@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Auth & Login</title>
+</head>
+<body>
+    <h1>Authentication Reset</h1>
+    <p>Click the button below to clear all authentication data and go to login.</p>
+    <button onclick="clearAndLogin()">Clear Auth & Login</button>
+
+    <script>
+        function clearAndLogin() {
+            // Clear all authentication data
+            localStorage.removeItem('companyId');
+            localStorage.removeItem('userRole');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('rememberDevice');
+
+            // Clear window variables
+            window.companyId = null;
+            window.userRole = null;
+            window.user = null;
+
+            // Go to login
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>

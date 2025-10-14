@@ -7,21 +7,25 @@ export default function MaintenanceTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ bus_id: '', driver_id: '', description: '', severity: 'low' });
 
-  const load = async () => {
-    const { data } = await supabase.from('incidents').select('*').eq('company_id', window.companyId).order('created_at', { ascending: false });
-    setIncidents(data || []);
-  };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const loadData = async () => {
+      const { data } = await supabase.from('incidents').select('incident_id, bus_id, driver_id, description, severity, status, created_at').eq('company_id', window.companyId).order('created_at', { ascending: false });
+      setIncidents(data || []);
+    };
+    loadData();
+  }, []);
 
   const createIncident = async () => {
     await supabase.from('incidents').insert([{ company_id: window.companyId, bus_id: form.bus_id || null, driver_id: form.driver_id || null, description: form.description, severity: form.severity }]);
     setDialogOpen(false);
     setForm({ bus_id: '', driver_id: '', description: '', severity: 'low' });
-    load();
+    const { data } = await supabase.from('incidents').select('incident_id, bus_id, driver_id, description, severity, status, created_at').eq('company_id', window.companyId).order('created_at', { ascending: false });
+    setIncidents(data || []);
   };
   const resolveIncident = async (id) => {
     await supabase.from('incidents').update({ status: 'Resolved' }).eq('incident_id', id);
-    load();
+    const { data } = await supabase.from('incidents').select('incident_id, bus_id, driver_id, description, severity, status, created_at').eq('company_id', window.companyId).order('created_at', { ascending: false });
+    setIncidents(data || []);
   };
 
   const exportCSV = () => {

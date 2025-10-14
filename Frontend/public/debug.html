@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Authentication Debug</title>
+</head>
+<body>
+    <h1>Authentication Debug</h1>
+    <div id="debug"></div>
+    <button onclick="refresh()">Refresh</button>
+
+    <script>
+        function refresh() {
+            const debug = document.getElementById('debug');
+            debug.innerHTML = `
+                <p><strong>Company ID:</strong> ${window.companyId || 'null'}</p>
+                <p><strong>User Role:</strong> ${window.userRole || 'null'}</p>
+                <p><strong>User ID:</strong> ${window.user?.id || 'null'}</p>
+                <p><strong>User:</strong> ${JSON.stringify(window.user, null, 2)}</p>
+                <p><strong>localStorage companyId:</strong> ${localStorage.getItem('companyId') || 'null'}</p>
+                <p><strong>localStorage userRole:</strong> ${localStorage.getItem('userRole') || 'null'}</p>
+                <p><strong>localStorage userId:</strong> ${localStorage.getItem('userId') || 'null'}</p>
+                <p><strong>Timestamp:</strong> ${new Date().toLocaleTimeString()}</p>
+            `;
+        }
+
+        // Auto refresh every 2 seconds
+        setInterval(refresh, 2000);
+        refresh(); // Initial load
+    </script>
+</body>
+</html>

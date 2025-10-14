@@ -13,7 +13,12 @@ export default function ShiftSchedulingTab() {
     const r = await getActivityLog({ types: ['shift'] });
     setShifts(r.data || []);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
 
   const create = async () => {
     if (!who || !when) return;
@@ -36,7 +41,7 @@ export default function ShiftSchedulingTab() {
         <Divider sx={{ my: 2 }} />
         <List dense>
           {(shifts || []).map((s) => {
-            let detail = ''; try { const m = JSON.parse(s.message || '{}'); detail = `${m.who || ''} • ${m.when || ''} • ${m.note || ''}`; } catch {}
+            let detail = ''; try { const m = JSON.parse(s.message || '{}'); detail = `${m.who || ''} • ${m.when || ''} • ${m.note || ''}`; } catch (error) { console.warn('Shift operation error:', error); }
             return <ListItem key={s.id}><ListItemText primary={detail || s.message} secondary={new Date(s.created_at).toLocaleString()} /></ListItem>;
           })}
         </List>

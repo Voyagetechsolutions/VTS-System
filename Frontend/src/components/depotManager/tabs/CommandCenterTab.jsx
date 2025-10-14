@@ -65,7 +65,12 @@ export default function CommandCenterTab() {
     ]);
     setBuses(b||[]); setDrivers(d||[]); setRoutes(r||[]); setTripsUpcoming(t||[]);
   })(); }, [companyId]);
-  useEffect(() => { loadAlerts(); }, [kpis]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await loadAlerts();
+    };
+    loadData();
+  }, [kpis]);
 
   const actions = [
     { label: 'Assign Bus', icon: 'bus', onClick: () => { setForm({ trip_id: '', bus_id: '', driver_id: '', route_id: '', km_to_service: '', notes: '' }); setAssignOpen(true); } },

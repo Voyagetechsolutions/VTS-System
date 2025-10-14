@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Paper, Typography, Button, Table, TableHead, TableRow, TableCell, TableBody, Chip } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { supabase } from '../../../supabase/client';
 
 export default function NotificationsTab() {

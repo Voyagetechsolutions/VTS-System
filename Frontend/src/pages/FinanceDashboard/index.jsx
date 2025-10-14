@@ -97,7 +97,7 @@ export default function FinanceDashboard() {
   const [tab, setTab] = React.useState(0);
   useEffect(() => {
     const role = window.userRole || (window.user?.role) || localStorage.getItem('userRole');
-    if (role && role !== 'finance_manager') {
+    if (!role || role !== 'finance_manager') {
       window.location.replace('/');
     }
   }, []);

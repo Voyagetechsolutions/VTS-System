@@ -58,8 +58,8 @@ const DataTable = ({
     el.addEventListener('scroll', onScroll);
     window.addEventListener('resize', onResize);
     return () => {
-      try { el.removeEventListener('scroll', onScroll); } catch {}
-      try { window.removeEventListener('resize', onResize); } catch {}
+      try { el.removeEventListener('scroll', onScroll); } catch (error) { console.warn('Scroll cleanup error:', error); }
+      try { window.removeEventListener('resize', onResize); } catch (error) { console.warn('Resize cleanup error:', error); }
     };
   }, [virtualize]);
   const [page, setPage] = useState(0);

@@ -51,7 +51,12 @@ export default function BillingDevTab() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
 
   const getPaymentStatus = (sub) => {
     if (!sub) return 'Unknown';

@@ -26,7 +26,12 @@ export default function StaffTab() {
     setRoutes(r || []);
     setBuses(b || []);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
 
   const filtered = staff.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
 

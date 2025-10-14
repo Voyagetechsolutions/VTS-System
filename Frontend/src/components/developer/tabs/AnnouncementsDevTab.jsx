@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Grid, Card, CardContent, Typography, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControl, InputLabel, Select, MenuItem, FormControlLabel, Checkbox, RadioGroup, Radio, Alert, IconButton, Tooltip } from '@mui/material';
-import { Add as AddIcon, Send as SendIcon, Visibility as ViewIcon, Edit as EditIcon, Delete as DeleteIcon, Announcement as AnnouncementIcon, Business as BusinessIcon, People as PeopleIcon, Email as EmailIcon, Notifications as NotificationsIcon } from '@mui/icons-material';
-import DashboardCard from '../../common/DashboardCard';
+import { Box, Grid, Card, CardContent, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControl, InputLabel, Select, MenuItem, FormControlLabel, RadioGroup, Radio } from '@mui/material';
+import { Add as AddIcon, Send as SendIcon, Visibility as ViewIcon, Edit as EditIcon, Delete as DeleteIcon, Announcement as AnnouncementIcon, People as PeopleIcon, Email as EmailIcon, Notifications as NotificationsIcon } from '@mui/icons-material';
 import DataTable from '../../common/DataTable';
 import { getCompaniesLight, getAnnouncements, createAnnouncement, sendAnnouncement, deleteAnnouncement } from '../../../supabase/api';
 
@@ -47,7 +46,12 @@ export default function AnnouncementsDevTab() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
 
   const filteredAnnouncements = announcements.filter(announcement => (
     (statusFilter ? announcement.status === statusFilter : true) &&

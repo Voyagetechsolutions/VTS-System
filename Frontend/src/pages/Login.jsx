@@ -4,14 +4,12 @@ import {
   Paper, 
   Typography, 
   TextField, 
-  Button, 
-  Stack, 
-  IconButton, 
-  Alert, 
-  Divider, 
-  Tooltip, 
-  FormControlLabel, 
-  Checkbox 
+  Button,
+  Stack,
+  Alert,
+  Divider,
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import GoogleIcon from '@mui/icons-material/Google';
@@ -21,6 +19,23 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useSupabaseAuth } from '../hooks/useSupabaseAuth';
 import { supabase } from '../supabase/client';
 
+const readFromStorage = (key) => {
+  try {
+    return localStorage.getItem(key);
+  } catch (err) {
+    console.error(`Failed to read ${key} from storage`, err);
+    return null;
+  }
+};
+
+const writeToStorage = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (err) {
+    console.error(`Failed to write ${key} to storage`, err);
+  }
+};
+
 export default function Login() {
   const { signInWithPassword, signInWithProvider } = useSupabaseAuth();
   const [email, setEmail] = useState('');
@@ -28,9 +43,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [remember, setRemember] = useState(() => {
-    try { return localStorage.getItem('rememberDevice') === 'true'; } catch { return false; }
-  });
+  const [remember, setRemember] = useState(() => readFromStorage('rememberDevice') === 'true');
   const location = useLocation();
   const navigate = useNavigate();
   const emailRef = useRef(null);
@@ -79,24 +92,24 @@ export default function Login() {
           .maybeSingle();
         if (u2) {
           role = u2.role || null;
-          try {
-            if (u2.company_id != null) localStorage.setItem('companyId', String(u2.company_id));
-            if (role) localStorage.setItem('userRole', role);
-            if (u2.user_id) localStorage.setItem('userId', String(u2.user_id));
-          } catch {}
+          if (u2.company_id != null) writeToStorage('companyId', String(u2.company_id));
+          if (role) writeToStorage('userRole', role);
+          if (u2.user_id) writeToStorage('userId', String(u2.user_id));
         }
-      } catch {}
+      } catch (innerErr) {
+        console.error('Failed to load supabase user profile', innerErr);
+      }
       // If still no role and we have an auth uid, optionally read from profiles
       if (!role && uid) {
         try {
           const { data: prof } = await supabase.from('profiles').select('role, company_id').eq('id', uid).maybeSingle();
           role = prof?.role || role;
-          try {
-            if (prof?.company_id != null) localStorage.setItem('companyId', String(prof.company_id));
-            if (role) localStorage.setItem('userRole', role);
-            if (uid) localStorage.setItem('userId', uid);
-          } catch {}
-        } catch {}
+          if (prof?.company_id != null) writeToStorage('companyId', String(prof.company_id));
+          if (role) writeToStorage('userRole', role);
+          if (uid) writeToStorage('userId', uid);
+        } catch (profileErr) {
+          console.error('Failed to load profile from Supabase', profileErr);
+        }
       }
       navigate(routeByRole(role));
     } catch (err) {
@@ -109,23 +122,22 @@ export default function Login() {
         });
         if (rpcErr) throw rpcErr;
         if (loginRes && loginRes.user_id) {
-          try {
-            if (loginRes.company_id != null) localStorage.setItem('companyId', String(loginRes.company_id));
-            if (loginRes.role) localStorage.setItem('userRole', String(loginRes.role));
-            localStorage.setItem('userId', String(loginRes.user_id));
-          } catch {}
+          if (loginRes.company_id != null) writeToStorage('companyId', String(loginRes.company_id));
+          if (loginRes.role) writeToStorage('userRole', String(loginRes.role));
+          writeToStorage('userId', String(loginRes.user_id));
           navigate(routeByRole(loginRes.role));
           return;
         }
         setError('Invalid email or password');
       } catch (fallbackErr) {
+        console.error('Password fallback failed', fallbackErr);
         setError(fallbackErr?.message || err.message || 'Invalid email or password');
       }
       // Focus first invalid field for a11y
       if (!email) {
-        try { emailRef.current?.focus(); } catch {}
+        emailRef.current?.focus();
       } else {
-        try { passwordRef.current?.focus(); } catch {}
+        passwordRef.current?.focus();
       }
     } finally {
       setLoading(false);
@@ -149,11 +161,13 @@ export default function Login() {
         const uid = session?.user?.id;
         if (!uid) return;
         // Avoid profiles call; use existing localStorage if present
-        const role = localStorage.getItem('userRole');
+        const role = readFromStorage('userRole');
         if (role) {
           navigate(routeByRole(role));
         }
-      } catch {}
+      } catch (err) {
+        console.error('Failed to restore session', err);
+      }
     })();
   }, [navigate]);
 
@@ -218,7 +232,7 @@ export default function Login() {
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                   <input type="checkbox" checked={remember} onChange={(e) => {
                     setRemember(e.target.checked);
-                    try { localStorage.setItem('rememberDevice', e.target.checked ? 'true' : 'false'); } catch {}
+                    writeToStorage('rememberDevice', e.target.checked ? 'true' : 'false');
                   }} aria-label="Remember this device" />
                   <Typography variant="body2">Remember this device</Typography>
                 </label>

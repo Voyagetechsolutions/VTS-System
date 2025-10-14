@@ -15,15 +15,17 @@ export default function FleetTab() {
   const [routes, setRoutes] = useState([]);
   const [assign, setAssign] = useState({ bus_id: '', route_id: '' });
 
-  const load = async () => {
-    const [{ data: buses }, { data: r }] = await Promise.all([
-      getFleetStatus(),
-      getCompanyRoutes(),
-    ]);
-    setFleet(buses || []);
-    setRoutes(r || []);
-  };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const loadData = async () => {
+      const [{ data: buses }, { data: r }] = await Promise.all([
+        getFleetStatus(),
+        getCompanyRoutes(),
+      ]);
+      setFleet(buses || []);
+      setRoutes(r || []);
+    };
+    loadData();
+  }, []);
 
   const filtered = fleet.filter(b => b.license_plate.toLowerCase().includes(search.toLowerCase()));
 
@@ -35,7 +37,12 @@ export default function FleetTab() {
     setDialogOpen(false);
     setEditing(null);
     setForm({ name: '', type: '', model: '', license_plate: '', capacity: 50, config: '2x2', features: { wifi: false, ac: false, charging: false, recliner: false, toilet: false }, insured: false, permit_number: '', status: 'Active' });
-    load();
+    const [{ data: buses }, { data: r }] = await Promise.all([
+      getFleetStatus(),
+      getCompanyRoutes(),
+    ]);
+    setFleet(buses || []);
+    setRoutes(r || []);
   };
 
   const openAssign = (bus) => { setAssign({ bus_id: bus.bus_id, route_id: '' }); setAssignOpen(true); };
@@ -43,7 +50,12 @@ export default function FleetTab() {
     if (assign.bus_id && assign.route_id) await assignBusToRoute(assign.bus_id, assign.route_id);
     setAssignOpen(false);
     setAssign({ bus_id: '', route_id: '' });
-    load();
+    const [{ data: buses }, { data: r }] = await Promise.all([
+      getFleetStatus(),
+      getCompanyRoutes(),
+    ]);
+    setFleet(buses || []);
+    setRoutes(r || []);
   };
 
   return (

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Grid, TextField, Select, MenuItem, Typography } from '@mui/material';
 import { supabase } from '../../../supabase/client';
 
@@ -12,17 +12,18 @@ export default function BookingWizard({ open, onClose, initialTripId, initialSte
   const [passengers, setPassengers] = useState([{ first_name: '', last_name: '', id_number: '', phone: '', email: '', emergency: '', dob: '', nationality: '' }]);
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [price, setPrice] = useState(0);
 
-  useEffect(() => { if (open) {
-    setStep(initialStep || 1);
-    setPassengers([{ first_name: '', last_name: '', id_number: '', phone: '', email: '', emergency: '', dob: '', nationality: '' }]);
-    setGroupSize(Math.max(1, initialSeats?.length || 1));
-    setSelectedSeats(initialSeats || []);
-    if (initialTripId) {
-      setSelection(s => ({ ...s, trip_id: initialTripId }));
+  useEffect(() => { 
+    if (open) {
+      setTimeout(() => {
+        setStep(initialStep || 1);
+        setPassengers([{ first_name: '', last_name: '', id_number: '', phone: '', email: '', emergency: '', dob: '', nationality: '' }]);
+        setGroupSize(Math.max(1, initialSeats?.length || 1));
+        setSelectedSeats(initialSeats || []);
+        if (initialTripId) setSelection(s => ({ ...s, trip_id: initialTripId }));
+      }, 0);
     }
-  } }, [open, initialTripId, initialStep, initialSeats]);
+  }, [open, initialStep, initialSeats, initialTripId]);
 
   useEffect(() => { (async () => { const { data } = await supabase.from('routes').select('route_id, origin, destination').eq('company_id', window.companyId); setRoutes(data || []); })(); }, []);
 
@@ -38,7 +39,7 @@ export default function BookingWizard({ open, onClose, initialTripId, initialSte
     setTrips(data || []);
   };
 
-  const loadSeats = async () => {
+  const loadSeats = useCallback(async () => {
     if (!selection.trip_id) return;
     const [{ data: booked }, { data: blocked }] = await Promise.all([
       supabase.from('bookings').select('seat_number').eq('trip_id', selection.trip_id),
@@ -49,9 +50,13 @@ export default function BookingWizard({ open, onClose, initialTripId, initialSte
     const blockedSet = new Set((blocked||[]).filter(s => s.blocked).map(s => Number(s.seat_number)));
     setTripSeats({ capacity, taken: takenSet, blocked: blockedSet });
     setSelectedSeats([]);
-  };
+  }, [selection.trip_id, trips]);
 
-  useEffect(() => { if (selection.trip_id) loadSeats(); }, [selection.trip_id]);
+  useEffect(() => { 
+    if (selection.trip_id) {
+      setTimeout(() => loadSeats(), 0);
+    }
+  }, [selection.trip_id, loadSeats]);
 
   const seatGrid = useMemo(() => Array.from({ length: Math.max(0, tripSeats.capacity) }, (_, i) => i + 1), [tripSeats]);
   const toggleSeat = (n) => {

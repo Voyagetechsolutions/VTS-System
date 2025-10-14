@@ -16,7 +16,12 @@ export default function InvoicingTab() {
     const { data } = await q.order('created_at', { ascending: false });
     setRows(data||[]);
   };
-  useEffect(() => { load(); }, [companyId, filter]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [companyId, filter]);
 
   return (
     <DashboardCard title="Invoicing & Corporate Clients" variant="outlined">

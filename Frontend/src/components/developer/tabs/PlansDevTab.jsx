@@ -109,7 +109,12 @@ export default function PlansDevTab() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
 
   const handleCreatePlan = async () => {
     try {

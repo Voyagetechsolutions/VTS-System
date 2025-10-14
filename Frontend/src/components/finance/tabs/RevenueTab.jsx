@@ -26,7 +26,12 @@ export default function RevenueTab() {
     const { data } = await q.order('created_at', { ascending: false });
     setRows(data || []);
   };
-  useEffect(() => { load(); }, [companyId, fromDate, toDate, method]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [companyId, fromDate, toDate, method]);
 
   const exportCSV = () => {
     const csv = toCSV(rows);

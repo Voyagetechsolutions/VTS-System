@@ -14,7 +14,12 @@ export default function SupportDevTab() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, []);
 
   const actions = [
     { label: 'Assign to me', icon: 'user', onClick: async ({ row }) => { await assignSupportTicket(row.id, window.userId); load(); } },

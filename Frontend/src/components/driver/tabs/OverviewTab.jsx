@@ -121,7 +121,12 @@ export default function OverviewTab() {
     try { const { data } = await computeDriverEarningsEstimate({}); setEarn({ estimate: data?.estimate || 0, completedTrips: data?.completedTrips || 0 }); } catch {}
   };
 
-  useEffect(() => { load(); }, [userId]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [userId]);
 
   const withinStartWindow = (row) => {
     const dep = new Date(row.departure_time).getTime();
@@ -163,10 +168,10 @@ export default function OverviewTab() {
       scriptEl = document.createElement('script');
       scriptEl.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.10/minified/html5-qrcode.min.js';
       scriptEl.async = true;
-      scriptEl.onload = () => { if (!cancelled) setCameraLoaded(true); };
+      scriptEl.onload = () => { if (!cancelled) setTimeout(() => setCameraLoaded(true), 0); };
       document.body.appendChild(scriptEl);
     } else {
-      setCameraLoaded(true);
+      setTimeout(() => setCameraLoaded(true), 0);
     }
     const maybeStartScanner = () => {
       try {

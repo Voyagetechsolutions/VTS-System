@@ -19,7 +19,12 @@ export default function AuditTrailTab({ scope = 'admin' }) {
     }
     setRows(list);
   };
-  useEffect(() => { load(); }, [limit]);
+  useEffect(() => { 
+    const loadData = async () => {
+      await load();
+    };
+    loadData();
+  }, [limit]);
 
   const inRange = (d) => {
     const ts = d ? new Date(d).getTime() : null;
