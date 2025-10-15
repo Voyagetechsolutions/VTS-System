@@ -649,7 +649,7 @@ export default function SidebarLayout({ children, title, navItems }) {
           transition: theme.transitions.normal,
           backgroundColor: theme.colors.background.secondary,
           minHeight: '100vh',
-          overflow: 'hidden',
+          overflow: 'auto',
         }}
       >
         <Toolbar />
