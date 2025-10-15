@@ -114,7 +114,7 @@ export default function FuelTab() {
           try {
             const { data, error } = await supabase.storage.from('evidence').upload(path, file, { upsert: true });
             if (!error) setForm(f => ({ ...f, receipt_url: data?.path || path }));
-          } catch {}
+          } catch { /* Ignore errors */ }
         }} />
         <ModernButton variant="contained" icon="save" onClick={save}>Save</ModernButton>
       </Box>

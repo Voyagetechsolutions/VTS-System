@@ -4,8 +4,7 @@ import {
   FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 import {
-  Timeline as TimelineIcon, Security as SecurityIcon, Assignment as AssignmentIcon,
-  Visibility as ViewIcon, GetApp as ExportIcon, FilterList as FilterIcon
+  GetApp as ExportIcon, Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { supabase } from '../../../supabase/client';
 import AuditTrailTable from '../components/AuditTrailTable';

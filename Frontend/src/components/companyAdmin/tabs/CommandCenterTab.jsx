@@ -27,7 +27,7 @@ export default function CommandCenterTab() {
   const [addRouteOpen, setAddRouteOpen] = useState(false);
   const [addRouteForm, setAddRouteForm] = useState({ origin: '', destination: '', departure_time: '', arrival_time: '', arrival_day: 'same_day', route_code: '' });
   const [assignOpen, setAssignOpen] = useState(false);
-  // const [addNewBusOpen, setAddNewBusOpen] = useState(false); // TODO: Implement add bus functionality
+  const [addNewBusOpen, setAddNewBusOpen] = useState(false);
   const [drivers, setDrivers] = useState([]);
   const [assignForm, setAssignForm] = useState({ driver_id: '', bus_id: '', route_id: '' });
 

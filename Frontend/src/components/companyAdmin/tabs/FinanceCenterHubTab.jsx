@@ -4,8 +4,7 @@ import {
   FormControl, InputLabel, Select, MenuItem, Tabs, Tab
 } from '@mui/material';
 import {
-  AttachMoney as MoneyIcon, TrendingUp as TrendIcon, Assessment as ReportIcon,
-  Receipt as ReceiptIcon, CreditCard as CardIcon, AccountBalance as BankIcon
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { supabase } from '../../../supabase/client';
 import SummaryCards from '../components/SummaryCards';

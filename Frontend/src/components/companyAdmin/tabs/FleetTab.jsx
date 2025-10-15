@@ -80,7 +80,7 @@ export default function FleetTab() {
       const msg = res.error.message || String(res.error);
       if (/model|schema cache/i.test(msg)) {
         // Retry without model field as a fallback
-        const { model, ...fallback } = payload;
+        const { model, ...fallback } = payload; // eslint-disable-line no-unused-vars
         const retry = editing ? await updateBus(editing.bus_id, fallback) : await createBus(fallback);
         if (retry?.error) { setError(retry.error.message || String(retry.error)); return; }
       } else {

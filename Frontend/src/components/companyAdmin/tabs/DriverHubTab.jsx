@@ -31,7 +31,7 @@ import {
   getDrivers,
   updateDriver,
   suspendDriver,
-  assignDriver,
+  // assignDriver, // TODO: Implement driver assignment
   listDriverTraining,
   upsertDriverTraining,
   listDriverKPIs,
@@ -122,8 +122,7 @@ export default function DriverHubTab() {
   }, [driverSearch, drivers]);
 
   const stats = useMemo(() => {
-    // Unused function - keeping for future use
-    // const assignDriver = async (driverId, routeId) => {
+    // TODO: Implement driver assignment functionality
     const today = new Date().toISOString().slice(0, 10);
     const shiftsToday = (shifts || []).filter((s) => (s.start_time || '').slice(0, 10) === today).length;
     const trainingCompletePct = (() => {
